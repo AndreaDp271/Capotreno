@@ -1,5 +1,6 @@
 package io.github.andreadp.trenolibero.ui
 
+import androidx.compose.material.icons.filled.LocationOn
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.animation.animateContentSize
@@ -148,6 +149,7 @@ fun JourneyScreen(nav: Nav) {
             item {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     StationField("Da", ref(from)) { from = it?.let { s -> "${s.id}|${s.name}" } }
+                    NearbyChips(prefill = from == null) { s -> from = "${s.codiceStazione}|${s.name}" }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             StationField("A", ref(to)) { to = it?.let { s -> "${s.id}|${s.name}" } }
@@ -227,6 +229,36 @@ private fun fmtDateTime(ms: Long): String =
 private fun duration(ms: Long): String {
     val min = ms / 60_000
     return if (min >= 60) "${min / 60}h ${"%02d".format(min % 60)}" else "$min min"
+}
+
+/** Stazioni più vicine come scelta rapida per la partenza; la più vicina viene proposta se il campo è vuoto. */
+@Composable
+private fun NearbyChips(prefill: Boolean, onPick: (io.github.andreadp.trenolibero.data.StationGeo) -> Unit) {
+    val ctx = LocalContext.current
+    var tick by remember { mutableStateOf(0) }
+    val perm = rememberLocationPermission { if (it) tick++ }
+    if (!perm.granted) {
+        AssistChip(onClick = { perm.request() }, label = { Text("Stazioni vicino a me") },
+            leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.LocationOn, null) })
+        return
+    }
+    val near = rememberLoader(tick) { UserLocation.current(ctx)?.let { UserLocation.nearestStations(it) } }
+    var prefilled by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(near.data) {
+        val first = near.data?.firstOrNull()?.first
+        if (prefill && !prefilled && first != null) { prefilled = true; onPick(first) }
+    }
+    near.data?.let { list ->
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            list.forEach { (s, km) ->
+                AssistChip(
+                    onClick = { onPick(s) },
+                    label = { Text("${s.name} · ${formatKm(km)}", maxLines = 1) },
+                    leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.LocationOn, null) },
+                )
+            }
+        }
+    }
 }
 
 /** Campo stazione con suggerimenti durante la digitazione. */

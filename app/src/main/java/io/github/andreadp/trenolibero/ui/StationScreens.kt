@@ -107,6 +107,11 @@ fun StationSearchScreen(nav: Nav) {
                         modifier = Modifier.clickable { nav.station(s.id, s.name) },
                     )
                 }
+            } else {
+                item { NearbyStations { s -> nav.station(s.codiceStazione, s.name) } }
+            }
+            if (query.trim().length >= 2) {
+                // risultati già mostrati sopra
             } else if (favStations.isNotEmpty()) {
                 item { SectionTitle("Stazioni preferite") }
                 items(favStations) { s ->

@@ -89,6 +89,8 @@ Descrizioni e changelog per lo store sono in `fastlane/metadata/android/`.
 ## Permessi
 
 - `INTERNET`: dati ViaggiaTreno e mappe OSM
+- `ACCESS_FINE/COARSE_LOCATION` (facoltativi, chiesti solo all'uso): stazioni vicine, posizione sulle mappe,
+  stazione di partenza suggerita; la posizione non lascia il dispositivo
 - `CAMERA` (facoltativo, chiesto solo all'uso): scansione del codice del biglietto
 
 ## Licenza

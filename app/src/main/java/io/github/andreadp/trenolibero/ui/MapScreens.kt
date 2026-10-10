@@ -292,6 +292,7 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
         Box(Modifier.padding(pad).fillMaxSize()) {
             AndroidView(factory = { map }, modifier = Modifier.fillMaxSize())
             OsmAttribution(Modifier.align(Alignment.BottomStart))
+            MyLocationButton(map, Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 96.dp))
             Legend(Modifier.align(Alignment.TopStart).padding(8.dp), detailed = showRegional, loading = trainsLoading)
 
             val stations = state.data
@@ -509,13 +510,15 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
         Box(Modifier.padding(pad).fillMaxSize()) {
             AndroidView(factory = { map }, modifier = Modifier.fillMaxSize())
             OsmAttribution(Modifier.align(Alignment.BottomStart))
+            MyLocationButton(map, Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 96.dp))
             val data = state.data
             val segments = route.data
             LaunchedEffect(data, segments) {
                 if (data == null) return@LaunchedEffect
                 val (a, stops, detections) = data
                 val firstDraw = map.overlays.isEmpty()
-                map.overlays.clear()
+                // la posizione dell'utente resta
+                map.overlays.removeAll { it !is org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay }
                 val known = stops.filter { it.second != null }
                 val pts = known.map { GeoPoint(it.second!!.lat, it.second!!.lon) }
                 val lastReachedKnown = known.indexOfLast { it.first.reached && !it.first.suppressed }
