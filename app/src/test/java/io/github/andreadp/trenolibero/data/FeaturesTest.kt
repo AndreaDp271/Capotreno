@@ -100,4 +100,27 @@ class FeaturesTest {
         assertEquals(InfoCategory.WORKS, c("INFOLAVORI LOMBARDIA", works = true))
         assertEquals(InfoCategory.OTHER, c("INFOTRENI FRECCE"))
     }
+
+    @Test
+    fun abbonamentoDaPdf() {
+        val text = """
+            Trenitalia - ABBONAMENTO MENSILE REGIONALE
+            Da: Padova  A: Venezia S.Lucia
+            Valido dal 01/10/2026 al 31/10/2026
+            Titolare: Mario Rossi
+        """.trimIndent()
+        val t = TicketParser.parse(text, stations + listOf("PADOVA", "VENEZIA S.LUCIA"))
+        assertTrue(t.isSubscription)
+        assertEquals("01/10/2026", t.validFrom)
+        assertEquals("31/10/2026", t.validTo)
+        assertEquals("REGIONAL", t.subscriptionType)
+        assertEquals("TRENITALIA", t.operator)
+        assertEquals("Padova", t.from)
+        assertEquals("Venezia S.lucia", t.to)
+
+        val av = TicketParser.parse("Abbonamento Frecce Inizio validità: 05/11/2026 Fine validità: 04/12/2026", stations)
+        assertEquals("05/11/2026", av.validFrom)
+        assertEquals("04/12/2026", av.validTo)
+        assertEquals("HIGH_SPEED", av.subscriptionType)
+    }
 }

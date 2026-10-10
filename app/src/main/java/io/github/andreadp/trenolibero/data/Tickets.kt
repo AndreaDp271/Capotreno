@@ -39,6 +39,13 @@ data class Ticket(
     /** Codice a barre trovato (QR_CODE, AZTEC…), vuoto se non trovato. */
     val codeFormat: String = "",
     val codeText: String = "",
+    /** Validità (abbonamenti): "dd/MM/yyyy". */
+    val validFrom: String = "",
+    val validTo: String = "",
+    /** È un abbonamento? e di che tipo/operatore (indizi dal testo). */
+    val isSubscription: Boolean = false,
+    val subscriptionType: String = "",
+    val operator: String = "",
 ) {
     val isImage: Boolean get() = kind == "image"
     val isScan: Boolean get() = kind == "scan"
@@ -273,6 +280,39 @@ object TicketParser {
     /** Testo che precede la posizione [i] sulla stessa riga (per scartare data/ora di emissione). */
     private fun lineBefore(t: String, i: Int): String = t.substring(t.lastIndexOf('\n', i - 1) + 1, i)
 
+    private val validRangeRx = Regex(
+        "(?:valid[oiaà]+|validit[aà]'?)?[^\\n]{0,20}?\\bdal\\s+(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})\\s+al\\s+(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})",
+        RegexOption.IGNORE_CASE,
+    )
+    private val validFromRx = Regex("(?:inizio\\s+validit[aà]'?|valido\\s+dal|validit[aà]'?\\s+dal|dal)\\s*[:/]?\\s*(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})", RegexOption.IGNORE_CASE)
+    private val validToRx = Regex("(?:fine\\s+validit[aà]'?|valido\\s+fino\\s+al|scadenza|al)\\s*[:/]?\\s*(\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4})", RegexOption.IGNORE_CASE)
+
+    /** Indizi per gli abbonamenti: periodo di validità, tipo e operatore. */
+    private fun subscriptionHints(t: String): Ticket {
+        val lower = t.lowercase()
+        val isSub = "abbonament" in lower || "carnet" in lower || "season" in lower
+        val range = validRangeRx.find(t)
+        val from = range?.groupValues?.get(1) ?: validFromRx.find(t)?.groupValues?.get(1)
+        val to = range?.groupValues?.get(2) ?: validToRx.findAll(t).map { it.groupValues[1] }.lastOrNull()
+        val type = when {
+            "frecc" in lower || "alta velocit" in lower || "\\bav\\b".toRegex().containsMatchIn(lower) -> "HIGH_SPEED"
+            "intercity" in lower -> "INTERCITY"
+            else -> "REGIONAL"
+        }
+        val operator = when {
+            "trenord" in lower -> "TRENORD"
+            "tper" in lower -> "TPER"
+            "trenitalia" in lower -> "TRENITALIA"
+            else -> "ANY"
+        }
+        return Ticket(
+            id = "", importedAt = 0,
+            validFrom = from?.let { normDate(it) }.orEmpty(),
+            validTo = to?.let { normDate(it) }.orEmpty(),
+            isSubscription = isSub, subscriptionType = type, operator = operator,
+        )
+    }
+
     fun parse(text: String, stationNames: List<String>): Ticket {
         val t = text.replace(' ', ' ')
         val trip = tripRx.find(t)
@@ -307,7 +347,13 @@ object TicketParser {
         }.distinct()
 
         val (from, to) = findStations(t, stationNames)
+        val hints = subscriptionHints(t)
         return Ticket(
+            validFrom = hints.validFrom,
+            validTo = hints.validTo,
+            isSubscription = hints.isSubscription,
+            subscriptionType = hints.subscriptionType,
+            operator = hints.operator,
             id = "",
             importedAt = 0,
             trains = trains,

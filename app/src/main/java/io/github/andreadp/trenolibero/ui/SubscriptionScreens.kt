@@ -263,11 +263,11 @@ fun SubscriptionScreen(nav: Nav, id: String) {
 // ---------------- Creazione / modifica ----------------
 
 @Composable
-fun SubscriptionDialog(initial: Subscription?, onDismiss: () -> Unit, onSave: (Subscription) -> Unit) {
+fun SubscriptionDialog(initial: Subscription?, title: String? = null, onDismiss: () -> Unit, onSave: (Subscription) -> Unit) {
     val ctx = LocalContext.current
     var name by remember { mutableStateOf(initial?.name.orEmpty()) }
-    var from by remember { mutableStateOf(initial?.let { StationRef(it.fromId, it.fromName) }) }
-    var to by remember { mutableStateOf(initial?.let { StationRef(it.toId, it.toName) }) }
+    var from by remember { mutableStateOf(initial?.takeIf { it.fromId.isNotEmpty() }?.let { StationRef(it.fromId, it.fromName) }) }
+    var to by remember { mutableStateOf(initial?.takeIf { it.toId.isNotEmpty() }?.let { StationRef(it.toId, it.toName) }) }
     var type by remember { mutableStateOf(initial?.type ?: SubscriptionType.REGIONAL) }
     var operator by remember { mutableStateOf(initial?.operator ?: SubscriptionOperator.ANY) }
     var validFrom by remember { mutableStateOf(initial?.validFrom ?: Subscription.formatDate(System.currentTimeMillis())) }
@@ -283,7 +283,7 @@ fun SubscriptionDialog(initial: Subscription?, onDismiss: () -> Unit, onSave: (S
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Nuovo abbonamento" else "Modifica abbonamento") },
+        title = { Text(title ?: if (initial == null) "Nuovo abbonamento" else "Modifica abbonamento") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Nome (es. Casa–Lavoro)") }, singleLine = true)

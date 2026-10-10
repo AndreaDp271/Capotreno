@@ -1,0 +1,1 @@
+Season tickets: import from PDF or image with route, validity, type and operator filled in automatically.

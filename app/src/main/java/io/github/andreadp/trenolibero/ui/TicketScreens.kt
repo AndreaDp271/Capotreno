@@ -85,6 +85,8 @@ suspend fun importTicket(uri: Uri): Result<Ticket> = runCatching { Graph.tickets
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TicketsScreen(nav: Nav) {
+    var importing by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
     val allTickets by Graph.tickets.tickets.collectAsState()
     val subs by Graph.subscriptions.items.collectAsState()
     // i documenti allegati agli abbonamenti non compaiono tra i biglietti
@@ -92,8 +94,16 @@ fun TicketsScreen(nav: Nav) {
     val tickets = allTickets.filter { it.id !in attached }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var newSub by remember { mutableStateOf(false) }
-    var importing by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    // abbonamento ricavato da un PDF, da confermare nella finestra di modifica
+    var draftSub by remember { mutableStateOf<io.github.andreadp.trenolibero.data.Subscription?>(null) }
+    val subScope = rememberCoroutineScope()
+    val subPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) subScope.launch {
+            importing = true; error = null
+            importTicket(uri).onSuccess { t -> draftSub = subscriptionFromTicket(t) }.onFailure { error = errorMessage(it) }
+            importing = false
+        }
+    }
     val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
@@ -105,11 +115,18 @@ fun TicketsScreen(nav: Nav) {
     Scaffold(
         topBar = { TopAppBar(title = { Text(if (tab == 0) "Biglietti" else "Abbonamenti") }) },
         floatingActionButton = {
-            if (tab == 1) ExtendedFloatingActionButton(
-                onClick = { newSub = true },
-                icon = { Icon(Icons.Default.Add, null) },
-                text = { Text("Nuovo abbonamento") },
-            ) else Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (tab == 1) Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ExtendedFloatingActionButton(
+                    onClick = { subPicker.launch(arrayOf("application/pdf", "image/*")) },
+                    icon = { Icon(painterResource(R.drawable.ic_tab_ticket), null) },
+                    text = { Text("Importa PDF") },
+                )
+                ExtendedFloatingActionButton(
+                    onClick = { newSub = true },
+                    icon = { Icon(Icons.Default.Add, null) },
+                    text = { Text("Nuovo abbonamento") },
+                )
+            } else Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ExtendedFloatingActionButton(
                     onClick = { nav.scan() },
                     icon = { Icon(painterResource(R.drawable.ic_qr_scan), null) },
@@ -130,8 +147,16 @@ fun TicketsScreen(nav: Nav) {
             }
             if (tab == 1) {
                 SubscriptionsList(nav)
+                if (importing) LinearProgressIndicator(Modifier.fillMaxWidth())
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
                 if (newSub) SubscriptionDialog(null, onDismiss = { newSub = false }) { s ->
                     Graph.subscriptions.save(s); newSub = false; nav.subscription(s.id)
+                }
+                draftSub?.let { d ->
+                    SubscriptionDialog(d, title = "Abbonamento dal PDF", onDismiss = {
+                        // annullato: il documento importato non serve più
+                        d.ticketId?.let { Graph.tickets.delete(it) }; draftSub = null
+                    }) { s -> Graph.subscriptions.save(s); draftSub = null; nav.subscription(s.id) }
                 }
                 return@Column
             }
@@ -155,6 +180,30 @@ fun TicketsScreen(nav: Nav) {
 private fun isToday(t: Ticket): Boolean {
     val f = SimpleDateFormat("dd/MM/yyyy", Locale.ITALY).apply { timeZone = io.github.andreadp.trenolibero.data.ViaggiaTrenoApi.ROME }
     return t.date == f.format(Date())
+}
+
+/** Bozza di abbonamento dai dati riconosciuti nel PDF (stazioni ricondotte ai codici ViaggiaTreno). */
+private suspend fun subscriptionFromTicket(t: io.github.andreadp.trenolibero.data.Ticket): io.github.andreadp.trenolibero.data.Subscription {
+    val stations = runCatching { Graph.stations.all() }.getOrDefault(emptyList())
+    fun find(name: String) = stations.firstOrNull {
+        io.github.andreadp.trenolibero.data.DetectionLocator.normalize(it.name) == io.github.andreadp.trenolibero.data.DetectionLocator.normalize(name)
+    }
+    val a = find(t.from)
+    val b = find(t.to)
+    return io.github.andreadp.trenolibero.data.Subscription(
+        id = io.github.andreadp.trenolibero.data.Subscription.newId(),
+        name = if (t.from.isNotEmpty() && t.to.isNotEmpty()) "${t.from} – ${t.to}" else "Abbonamento",
+        fromId = a?.codiceStazione.orEmpty(), fromName = a?.name.orEmpty(),
+        toId = b?.codiceStazione.orEmpty(), toName = b?.name.orEmpty(),
+        type = runCatching { io.github.andreadp.trenolibero.data.SubscriptionType.valueOf(t.subscriptionType) }
+            .getOrDefault(io.github.andreadp.trenolibero.data.SubscriptionType.REGIONAL),
+        operator = runCatching { io.github.andreadp.trenolibero.data.SubscriptionOperator.valueOf(t.operator) }
+            .getOrDefault(io.github.andreadp.trenolibero.data.SubscriptionOperator.ANY),
+        validFrom = t.validFrom.ifEmpty { t.date },
+        validTo = t.validTo,
+        holder = t.passenger,
+        ticketId = t.id,
+    )
 }
 
 @Composable
