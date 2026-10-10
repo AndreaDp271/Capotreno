@@ -1,0 +1,1 @@
+Buy opens the Trenitalia search prefilled with route, date and time of the journey.

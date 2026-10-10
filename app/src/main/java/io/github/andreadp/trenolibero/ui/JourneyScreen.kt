@@ -295,6 +295,7 @@ private fun dayOf(l: JourneyLeg) = l.dateMs ?: midnight(l.departure)
 private fun JourneyCard(nav: Nav, j: Journey) {
     var open by rememberSaveable { mutableStateOf(false) }
     val uri = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
     Card(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).animateContentSize().clickable { open = !open },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -387,13 +388,20 @@ private fun JourneyCard(nav: Nav, j: Journey) {
                         ) { Text("Visualizza treno") }
                     }
                     sellers.forEach { s ->
-                        Button(onClick = { uri.openUri(s.url) }, modifier = Modifier.weight(1f)) {
+                        Button(onClick = {
+                            if (s.name == "Trenitalia") {
+                                // ricerca già compilata sul sito Trenitalia, a partire dall'ora di questa soluzione
+                                scope.launch { uri.openUri(runCatching { JourneySearch.trenitaliaBuyUrl(j) }.getOrDefault(s.url)) }
+                            } else uri.openUri(s.url)
+                        }, modifier = Modifier.weight(1f)) {
                             Text(if (sellers.size == 1) "Acquista" else "Acquista ${s.name}", maxLines = 1)
                         }
                     }
                 }
                 Text(
-                    "L'acquisto avviene sul sito di ${sellers.joinToString(" / ") { it.name }}.",
+                    if (sellers.any { it.name == "Trenitalia" })
+                        "Si apre la ricerca Trenitalia per questa tratta e orario: scegli la soluzione e acquista."
+                    else "L'acquisto avviene sul sito di ${sellers.joinToString(" / ") { it.name }}.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),

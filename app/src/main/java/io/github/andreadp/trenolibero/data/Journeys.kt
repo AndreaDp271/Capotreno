@@ -83,6 +83,38 @@ object JourneySearch {
     private const val LEFRECCE = "https://www.lefrecce.it/Channels.Website.BFF.WEB/website/ticket/solutions"
     private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build()
 
+    /** Nome della stazione come lo usa lefrecce (es. "VENEZIA S.LUCIA" -> "Venezia S. Lucia"). */
+    private fun lefrecceName(name: String): String = runCatching {
+        val url = "https://www.lefrecce.it/Channels.Website.BFF.WEB/website/locations/search?name=" +
+            java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20") + "&limit=1"
+        val req = Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 (Linux; Android 14) Chrome/130.0 Mobile Safari/537.36").build()
+        client.newCall(req).execute().use { r ->
+            val arr = ViaggiaTrenoApi.json.parseToJsonElement(r.body!!.string()) as kotlinx.serialization.json.JsonArray
+            (arr.firstOrNull() as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
+        }
+    }.getOrNull() ?: name
+
+    /**
+     * Pagina di acquisto Trenitalia già compilata (tratta, data, ora e tipo di treno), tramite il punto
+     * d'ingresso "handoff" che il sito offre ai siti esterni. La soluzione si sceglie dall'elenco, che parte
+     * dall'ora del treno.
+     */
+    suspend fun trenitaliaBuyUrl(j: Journey): String = withContext(Dispatchers.IO) {
+        val from = lefrecceName(j.legs.first().from)
+        val to = lefrecceName(j.legs.last().to)
+        val date = SimpleDateFormat("dd-MM-yyyy", Locale.US).apply { timeZone = ViaggiaTrenoApi.ROME }.format(Date(j.departure))
+        val hour = SimpleDateFormat("HH", Locale.US).apply { timeZone = ViaggiaTrenoApi.ROME }.format(Date(j.departure))
+        val type = when (j.kinds) {
+            setOf(TrainKind.HIGH_SPEED) -> "frecce"
+            setOf(TrainKind.REGIONAL) -> "regionali"
+            setOf(TrainKind.INTERCITY) -> "intercity"
+            else -> "tutti"
+        }
+        fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20")
+        "https://www.lefrecce.it/Channels.Website.WEB/#/handoff?departureStation=${enc(from)}&arrivalStation=${enc(to)}" +
+            "&departureDate=$date&departureTime=$hour&noOfAdults=1&noOfChildren=0&selectedTrainType=$type&lang=it"
+    }
+
     /**
      * Lefrecce vende anche regionali di altre imprese (es. Trenord) senza indicarle:
      * la compagnia si attribuisce solo dove è certa; i diretti letti da ViaggiaTreno la riportano esattamente.
