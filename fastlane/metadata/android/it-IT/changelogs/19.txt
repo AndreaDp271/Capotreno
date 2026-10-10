@@ -1,0 +1,1 @@
+Nuova schermata del treno: fermate passate, in corso e da fare ben distinte, treno animato tra una fermata e l'altra con avanzamento del tratto, barra di avanzamento del viaggio e scorrimento automatico alla posizione attuale.

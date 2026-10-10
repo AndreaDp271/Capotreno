@@ -3,7 +3,7 @@
 Client Android libero e **non ufficiale** dei dati in tempo reale di
 [ViaggiaTreno](http://www.viaggiatreno.it/infomobilita/index.jsp) (RFI/Trenitalia).
 
-- **Andamento treno**: fermate, orari programmati/effettivi/previsti, ritardo, ultimo rilevamento, binari programmati ed effettivi
+- **Andamento treno**: timeline animata con fermate passate, tratto in corso e fermate da fare; orari programmati/effettivi/previsti, ritardo, ultimo rilevamento, binari programmati ed effettivi
 - **Tabellone di stazione**: partenze e arrivi, anche da un orario a scelta
 - **Mappa** OpenStreetMap (osmdroid): stazioni e linee con i treni in transito (tocca una linea per l'elenco)
 - **Linee e percorsi sui binari reali**: la rete ferroviaria OSM è inclusa nell'app (offline), i percorsi sono calcolati sul telefono

@@ -1,0 +1,1 @@
+Redesigned train screen: passed, current and upcoming stops clearly distinguished, animated train between stops with leg progress, trip progress bar and auto-scroll to the current position.
