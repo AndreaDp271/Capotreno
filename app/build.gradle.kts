@@ -22,8 +22,8 @@ android {
         applicationId = "io.github.andreadp.trenolibero"
         minSdk = 24
         targetSdk = 35
-        versionCode = 15
-        versionName = "1.6.3"
+        versionCode = 16
+        versionName = "1.7.0"
     }
 
     signingConfigs {
@@ -85,6 +85,7 @@ dependencies {
     implementation("org.osmdroid:osmdroid-android:6.1.20")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.google.zxing:core:3.5.3")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.camera:camera-camera2:1.4.0")
     implementation("androidx.camera:camera-lifecycle:1.4.0")
     implementation("androidx.camera:camera-view:1.4.0")

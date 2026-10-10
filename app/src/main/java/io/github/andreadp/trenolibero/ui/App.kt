@@ -64,6 +64,8 @@ class Nav(private val c: NavHostController) {
     fun subscription(id: String) = c.navigate("subscription/${Uri.encode(id)}")
 
     fun journey() = c.navigate("journey")
+
+    fun settings() = c.navigate("settings")
 }
 
 /** Voce della barra: icona Material o disegno vettoriale dell'app. */
@@ -81,7 +83,7 @@ private val tabs = listOf(
  * [pendingImport]: PDF ricevuto da un'altra app (condividi/apri con), da importare come biglietto.
  */
 @Composable
-fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}) {
+fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}, pendingRoute: String? = null, onRouteHandled: () -> Unit = {}) {
     val controller = rememberNavController()
     val nav = remember(controller) { Nav(controller) }
     var importError by remember { mutableStateOf<String?>(null) }
@@ -89,6 +91,11 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}) {
         val uri = pendingImport ?: return@LaunchedEffect
         importTicket(uri).onSuccess { nav.ticket(it.id) }.onFailure { importError = errorMessage(it) }
         onImportHandled()
+    }
+    LaunchedEffect(pendingRoute) {
+        val r = pendingRoute ?: return@LaunchedEffect
+        runCatching { controller.navigate(r) }
+        onRouteHandled()
     }
     importError?.let { msg ->
         AlertDialog(
@@ -137,6 +144,7 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}) {
             ) { ScanScreen(nav, it.arguments?.getString("attach")) }
             composable("subscription/{id}") { SubscriptionScreen(nav, it.arguments!!.getString("id")!!) }
             composable("journey") { JourneyScreen(nav) }
+            composable("settings") { SettingsScreen(nav) }
             composable("ticket/{id}") { TicketScreen(nav, it.arguments!!.getString("id")!!) }
             composable("line/{region}/{ab}/{ba}") {
                 val a = it.arguments!!

@@ -14,6 +14,8 @@ Client Android libero e **non ufficiale** dei dati in tempo reale di
   treni diretti di tutte le imprese presenti su ViaggiaTreno; filtri per tipo di treno e compagnia (Italo non disponibile)
 - **Abbonamenti**: tratta, tipo, operatore e validità (con avviso di scadenza), QR allegato da mostrare al controllore,
   treni diretti compatibili in tempo reale nei due sensi
+- **Notifiche** attivabili (controllo locale con WorkManager, nessun push esterno): promemoria e variazioni del treno
+  del biglietto, ritardi/binari/soppressioni dei treni preferiti, nuovi scioperi, scadenza abbonamenti
 - **Infomobilità**: avvisi divisi per circolazione, scioperi, lavori (per regione), altre info; treni in circolazione
 - **Preferiti** salvati solo sul dispositivo
 - Nessuna dipendenza proprietaria: niente Google Play Services, niente tracciamento
@@ -91,6 +93,7 @@ Descrizioni e changelog per lo store sono in `fastlane/metadata/android/`.
 - `INTERNET`: dati ViaggiaTreno e mappe OSM
 - `ACCESS_FINE/COARSE_LOCATION` (facoltativi, chiesti solo all'uso): stazioni vicine, posizione sulle mappe,
   stazione di partenza suggerita; la posizione non lascia il dispositivo
+- `POST_NOTIFICATIONS` (facoltativo, chiesto quando attivi una notifica)
 - `CAMERA` (facoltativo, chiesto solo all'uso): scansione del codice del biglietto
 
 ## Licenza

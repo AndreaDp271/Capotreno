@@ -154,7 +154,9 @@ fun JourneyScreen(nav: Nav) {
                         Column(Modifier.weight(1f)) {
                             StationField("A", ref(to)) { to = it?.let { s -> "${s.id}|${s.name}" } }
                         }
-                        IconButton(onClick = { val t = from; from = to; to = t }) { Icon(Icons.Default.Refresh, "Inverti") }
+                        IconButton(onClick = { val t = from; from = to; to = t }) {
+                            Icon(androidx.compose.ui.res.painterResource(io.github.andreadp.trenolibero.R.drawable.ic_swap_vert), "Scambia partenza e arrivo")
+                        }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         AssistChip(

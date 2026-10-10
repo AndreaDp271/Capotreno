@@ -1,0 +1,2 @@
+Optional notifications: ticket reminders and changes, delays/platforms/cancellations of favourite trains, new strikes, season ticket expiry.
+Double-arrow icons to swap direction.

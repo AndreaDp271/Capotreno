@@ -230,7 +230,7 @@ fun SubscriptionScreen(nav: Nav, id: String) {
                         Text("$from → $to", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(start = 16.dp))
                     }
-                    AssistChip(onClick = { reverse = !reverse }, label = { Text("Inverti") }, leadingIcon = { Icon(Icons.Default.Refresh, null) })
+                    AssistChip(onClick = { reverse = !reverse }, label = { Text("Inverti") }, leadingIcon = { Icon(painterResource(R.drawable.ic_swap_horiz), null) })
                 }
                 Text(
                     "Diretti nelle prossime ore validi per il tuo abbonamento, con ritardo e binario in tempo reale.",

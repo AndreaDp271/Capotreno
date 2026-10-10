@@ -19,7 +19,15 @@ class MainActivity : ComponentActivity() {
     /** PDF arrivato con "Condividi" / "Apri con" da un'altra app. */
     private var pendingImport by mutableStateOf<Uri?>(null)
 
+    /** Schermata da aprire toccando una notifica. */
+    private var pendingRoute by mutableStateOf<String?>(null)
+
     private fun handle(intent: Intent?) {
+        intent?.getStringExtra(io.github.andreadp.trenolibero.data.Notifier.EXTRA_TRAIN)?.split("|")?.takeIf { it.size == 3 }?.let { (n, o, d) ->
+            pendingRoute = "train/$n?origin=$o&date=$d"
+        }
+        intent?.getStringExtra(io.github.andreadp.trenolibero.data.Notifier.EXTRA_SUBSCRIPTION)?.let { pendingRoute = "subscription/$it" }
+        intent?.getStringExtra(io.github.andreadp.trenolibero.data.Notifier.EXTRA_INFO)?.let { pendingRoute = "info" }
         val uri = when (intent?.action) {
             Intent.ACTION_VIEW -> intent.data
             Intent.ACTION_SEND -> @Suppress("DEPRECATION") (intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
@@ -44,6 +52,12 @@ class MainActivity : ComponentActivity() {
         }
         enableEdgeToEdge()
         if (savedInstanceState == null) handle(intent)
-        setContent { TrenoTheme { App(pendingImport) { pendingImport = null } } }
+        io.github.andreadp.trenolibero.data.Notifier.createChannels(this)
+        io.github.andreadp.trenolibero.data.Notifier.schedule(this)
+        setContent {
+            TrenoTheme {
+                App(pendingImport, { pendingImport = null }, pendingRoute) { pendingRoute = null }
+            }
+        }
     }
 }
