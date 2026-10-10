@@ -138,16 +138,7 @@ fun MyLocationButton(map: org.osmdroid.views.MapView, modifier: androidx.compose
     var centerNext by remember { mutableStateOf(false) }
     val perm = rememberLocationPermission { if (it) centerNext = true }
     val overlay = remember {
-        org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay(
-            org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider(ctx), map,
-        ).apply {
-            // pallino blu con bordo bianco al posto dell'omino predefinito
-            val dot = blueDot(ctx)
-            setPersonIcon(dot)
-            setDirectionArrow(dot, dot)
-            setPersonAnchor(0.5f, 0.5f)
-            setDirectionAnchor(0.5f, 0.5f)
-        }
+        PulsingLocationOverlay(ctx, map)
     }
     androidx.compose.runtime.DisposableEffect(perm.granted) {
         if (perm.granted) {
@@ -174,13 +165,46 @@ fun MyLocationButton(map: org.osmdroid.views.MapView, modifier: androidx.compose
     }
 }
 
-private fun blueDot(ctx: Context): android.graphics.Bitmap {
-    val d = ctx.resources.displayMetrics.density
-    val size = (22 * d).toInt()
-    val b = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
-    val c = android.graphics.Canvas(b)
-    val r = size / 2f
-    c.drawCircle(r, r, r - d, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() })
-    c.drawCircle(r, r, r - 4 * d, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1A73E8.toInt() })
-    return b
+/**
+ * Posizione dell'utente: pallino blu con bordo bianco, alone pulsante e cerchio di precisione
+ * (al posto dell'omino predefinito di osmdroid).
+ */
+class PulsingLocationOverlay(ctx: Context, private val map: org.osmdroid.views.MapView) :
+    org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay(
+        org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider(ctx), map,
+    ) {
+    private val density = ctx.resources.displayMetrics.density
+    private val blue = 0xFF1A73E8.toInt()
+    private val fill = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    private val point = android.graphics.Point()
+    private val start = android.os.SystemClock.uptimeMillis()
+
+    init { isDrawAccuracyEnabled = false }
+
+    override fun drawMyLocation(canvas: android.graphics.Canvas, pj: org.osmdroid.views.Projection, lastFix: android.location.Location) {
+        pj.toPixels(org.osmdroid.util.GeoPoint(lastFix.latitude, lastFix.longitude), point)
+        val x = point.x.toFloat(); val y = point.y.toFloat()
+        // cerchio di precisione
+        val accPx = pj.metersToPixels(lastFix.accuracy, lastFix.latitude, pj.zoomLevel)
+        if (accPx > 12 * density) {
+            fill.color = 0x221A73E8
+            canvas.drawCircle(x, y, accPx, fill)
+        }
+        // alone pulsante: si espande e svanisce ogni 1,8 s
+        val phase = ((android.os.SystemClock.uptimeMillis() - start) % 1800L) / 1800f
+        val r = 9 * density
+        fill.color = blue
+        fill.alpha = ((1f - phase) * 90).toInt()
+        canvas.drawCircle(x, y, r + phase * 18 * density, fill)
+        // pallino con bordo bianco e leggera ombra
+        fill.alpha = 255
+        fill.color = 0x33000000
+        canvas.drawCircle(x, y + density, r + 3 * density, fill)
+        fill.color = 0xFFFFFFFF.toInt()
+        canvas.drawCircle(x, y, r + 2.5f * density, fill)
+        fill.color = blue
+        canvas.drawCircle(x, y, r, fill)
+        // ridisegno continuo solo mentre la posizione è attiva
+        map.postInvalidateDelayed(40)
+    }
 }
