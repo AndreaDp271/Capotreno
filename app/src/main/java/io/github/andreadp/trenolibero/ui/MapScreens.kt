@@ -473,7 +473,7 @@ fun railProfile(title: String): RailNetwork.Profile {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
-    val state = rememberLoader(number, originId, dateMs, refreshMs = 60_000) {
+    val state = rememberLoader(number, originId, dateMs, refreshMs = 30_000) {
         val (m, a) = resolveTrain(number, originId, dateMs)
         val stops = a.fermate.map { f -> f to Graph.stations.get(f.id) }
         val history = DetectionHistory.record(DetectionHistory.key(m.originId, m.number, m.dateMs), a)
@@ -509,7 +509,12 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.data?.first?.title?.let { "Percorso $it" } ?: "Percorso treno $number") },
+                title = {
+                    Column {
+                        Text(state.data?.first?.title?.let { "Percorso $it" } ?: "Percorso treno $number")
+                        RefreshStatus(state)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { nav.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro") }
                 },

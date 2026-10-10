@@ -1,0 +1,1 @@
+Roman-numeral platforms shown as Arabic numbers. More frequent auto refresh (30 s) for train and map, immediate when you return to the app, with the last update time in the top bar.

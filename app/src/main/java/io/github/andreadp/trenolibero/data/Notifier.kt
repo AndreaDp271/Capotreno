@@ -196,8 +196,8 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
                 ?.let { "\nUltimo rilevamento: $it alle ${hm(a.oraUltimoRilevamento)}" }.orEmpty()
             Notifier.notify(applicationContext, channel, id, "$prefix${a.title}: +$delay min", route + where, extra)
         }
-        val prog = platformStop?.binarioProgrammatoPartenzaDescrizione?.trim().orEmpty()
-        val eff = platformStop?.binarioEffettivoPartenzaDescrizione?.trim().orEmpty()
+        val prog = platformLabel(platformStop?.binarioProgrammatoPartenzaDescrizione).orEmpty()
+        val eff = platformLabel(platformStop?.binarioEffettivoPartenzaDescrizione).orEmpty()
         if (eff.isNotEmpty() && prog.isNotEmpty() && eff != prog && once("$key:platform:$eff")) {
             Notifier.notify(
                 applicationContext, channel, id + 1, "$prefix${a.title}: cambio binario",
@@ -233,7 +233,7 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
             val extra = Notifier.EXTRA_TRAIN to "${m.number}|${m.originId}|${m.dateMs}"
             val minutes = (dep - now) / 60_000
             if (minutes in 0..settings.reminderMinutes.toLong() && once("ticket:${t.id}:reminder")) {
-                val platform = (stop?.binarioEffettivoPartenzaDescrizione ?: stop?.binarioProgrammatoPartenzaDescrizione)
+                val platform = platformLabel(stop?.binarioEffettivoPartenzaDescrizione ?: stop?.binarioProgrammatoPartenzaDescrizione)
                     ?.takeIf { it.isNotBlank() }?.let { " · binario $it" }.orEmpty()
                 val delay = a.ritardo?.takeIf { it != 0 }?.let { " · ${if (it > 0) "+" else ""}$it min" }.orEmpty()
                 val seat = listOfNotNull(
@@ -294,7 +294,7 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
             ViaggiaTrenoApi.departures(sid).take(6).map { e ->
                 buildString {
                     append("${hm(e.orarioPartenza)} ${e.title} → ${e.destinazione.orEmpty()}")
-                    (e.binarioEffettivoPartenzaDescrizione ?: e.binarioProgrammatoPartenzaDescrizione)?.takeIf { it.isNotBlank() }?.let { append(" · bin. $it") }
+                    platformLabel(e.binarioEffettivoPartenzaDescrizione ?: e.binarioProgrammatoPartenzaDescrizione)?.takeIf { it.isNotBlank() }?.let { append(" · bin. $it") }
                     when {
                         e.provvedimento == 1 -> append(" · SOPPRESSO")
                         (e.ritardo ?: 0) > 0 && e.nonPartito != true -> append(" · +${e.ritardo} min")

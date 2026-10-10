@@ -88,7 +88,7 @@ class AlarmWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
         val lead = alarm.minutesBefore * 60_000L
         if (stop.arrivoReale != null || remaining <= lead + 60_000L) {
             val minutes = (remaining / 60_000).coerceAtLeast(0)
-            val platform = (stop.binarioEffettivoArrivoDescrizione ?: stop.binarioProgrammatoArrivoDescrizione)
+            val platform = platformLabel(stop.binarioEffettivoArrivoDescrizione ?: stop.binarioProgrammatoArrivoDescrizione)
                 ?.takeIf { it.isNotBlank() }?.let { " · binario $it" }.orEmpty()
             Notifier.notify(
                 ctx, Notifier.CH_ALARMS, id,

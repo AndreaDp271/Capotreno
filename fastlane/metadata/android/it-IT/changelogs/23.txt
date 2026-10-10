@@ -1,0 +1,1 @@
+Binari in numeri romani convertiti in numeri arabi. Aggiornamento automatico più frequente (30 s) per treno e mappa, immediato quando torni nell'app, con l'ora dell'ultimo aggiornamento nella barra in alto.

@@ -227,7 +227,7 @@ object JourneySearch {
                         Journey(
                             listOf(leg),
                             delay = a.ritardo.takeIf { a.nonPartito != true },
-                            platform = fa.binarioEffettivoPartenzaDescrizione ?: fa.binarioProgrammatoPartenzaDescrizione,
+                            platform = platformLabel(fa.binarioEffettivoPartenzaDescrizione ?: fa.binarioProgrammatoPartenzaDescrizione),
                             cancelled = e.provvedimento == 1 || a.cancelled,
                         )
                     }.getOrNull()

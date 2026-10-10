@@ -156,7 +156,12 @@ fun StationBoardScreen(nav: Nav, stationId: String, stationName: String) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stationName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = {
+                    androidx.compose.foundation.layout.Column {
+                        Text(stationName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        RefreshStatus(state)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { nav.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro") }
                 },

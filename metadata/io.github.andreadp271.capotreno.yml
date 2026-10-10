@@ -15,9 +15,9 @@ RepoType: git
 Repo: https://github.com/AndreaDp271/Capotreno.git
 
 Builds:
-  - versionName: 2.1.1
-    versionCode: 22
-    commit: v2.1.1
+  - versionName: 2.2.0
+    versionCode: 23
+    commit: v2.2.0
     subdir: app
     gradle:
       - yes
@@ -26,5 +26,5 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 2.1.1
-CurrentVersionCode: 22
+CurrentVersion: 2.2.0
+CurrentVersionCode: 23

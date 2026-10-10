@@ -215,7 +215,7 @@ suspend fun resolveTrain(number: String, originId: String?, dateMs: Long?): Pair
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
-    val state = rememberLoader(number, originId, dateMs, refreshMs = 60_000) {
+    val state = rememberLoader(number, originId, dateMs, refreshMs = 30_000) {
         resolveTrain(number, originId, dateMs).also { (m, a) ->
             DetectionHistory.record(DetectionHistory.key(m.originId, m.number, m.dateMs), a)
         }
@@ -235,7 +235,12 @@ fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(loaded?.second?.title ?: "Treno $number") },
+                title = {
+                    Column {
+                        Text(loaded?.second?.title ?: "Treno $number")
+                        RefreshStatus(state)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { nav.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro") }
                 },

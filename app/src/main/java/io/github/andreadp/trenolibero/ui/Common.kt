@@ -1,5 +1,9 @@
 package io.github.andreadp.trenolibero.ui
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloat
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.andreadp.trenolibero.data.ViaggiaTrenoApi
+import io.github.andreadp.trenolibero.data.platformLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import java.io.IOException
@@ -68,10 +73,19 @@ object Palette {
 
 // ---------- Caricamento dati ----------
 
-class Loaded<T>(val data: T?, val error: String?, val loading: Boolean, val reload: () -> Unit)
+class Loaded<T>(
+    val data: T?,
+    val error: String?,
+    val loading: Boolean,
+    /** Ora dell'ultimo aggiornamento riuscito (ms). */
+    val updatedAt: Long? = null,
+    val refreshMs: Long? = null,
+    val reload: () -> Unit,
+)
 
 /**
  * Esegue [block] al cambio di [keys] e, se [refreshMs] non è null, lo ripete periodicamente.
+ * Al ritorno nell'app (ON_RESUME) aggiorna subito se i dati sono più vecchi di [refreshMs].
  * I dati precedenti restano visibili durante l'aggiornamento.
  */
 @Composable
@@ -79,6 +93,7 @@ fun <T> rememberLoader(vararg keys: Any?, refreshMs: Long? = null, block: suspen
     var data by remember(*keys) { mutableStateOf<T?>(null) }
     var error by remember(*keys) { mutableStateOf<String?>(null) }
     var loading by remember(*keys) { mutableStateOf(true) }
+    var updatedAt by remember(*keys) { mutableStateOf<Long?>(null) }
     var tick by remember(*keys) { mutableIntStateOf(0) }
     LaunchedEffect(*keys, tick) {
         while (true) {
@@ -86,6 +101,7 @@ fun <T> rememberLoader(vararg keys: Any?, refreshMs: Long? = null, block: suspen
             try {
                 data = block()
                 error = null
+                updatedAt = System.currentTimeMillis()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -96,7 +112,51 @@ fun <T> rememberLoader(vararg keys: Any?, refreshMs: Long? = null, block: suspen
             delay(refreshMs)
         }
     }
-    return Loaded(data, error, loading) { tick++ }
+    if (refreshMs != null) {
+        val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+        androidx.compose.runtime.DisposableEffect(owner, *keys) {
+            val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+                val age = System.currentTimeMillis() - (updatedAt ?: 0L)
+                if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME && !loading && age > refreshMs) tick++
+            }
+            owner.lifecycle.addObserver(obs)
+            onDispose { owner.lifecycle.removeObserver(obs) }
+        }
+    }
+    return Loaded(data, error, loading, updatedAt, refreshMs) { tick++ }
+}
+
+/** Sottotitolo della barra: "Aggiornato alle 16:21 · ogni 30 s", con pallino che pulsa durante l'aggiornamento. */
+@Composable
+fun RefreshStatus(state: Loaded<*>) {
+    val at = state.updatedAt ?: return
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "refresh")
+        val a by t.animateFloat(
+            0.25f, 1f,
+            androidx.compose.animation.core.infiniteRepeatable(
+                androidx.compose.animation.core.tween(500), androidx.compose.animation.core.RepeatMode.Reverse,
+            ),
+            label = "a",
+        )
+        Box(
+            Modifier.size(7.dp).background(
+                if (state.error != null) Palette.veryLate else Palette.onTime.copy(alpha = if (state.loading) a else 1f),
+                androidx.compose.foundation.shape.CircleShape,
+            ),
+        )
+        Text(
+            when {
+                state.loading -> "Aggiornamento…"
+                state.error != null -> "Non aggiornato · ultimo alle ${fmtTime(at)}"
+                else -> "Aggiornato alle " + java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ITALY)
+                    .apply { timeZone = ViaggiaTrenoApi.ROME }.format(java.util.Date(at)) +
+                    (state.refreshMs?.let { " · ogni ${it / 1000} s" } ?: "")
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 fun errorMessage(e: Throwable): String = when (e) {
@@ -181,8 +241,8 @@ fun DelayBadge(min: Int?, modifier: Modifier = Modifier) {
 /** Binario: evidenziato se l'effettivo differisce dal programmato. */
 @Composable
 fun PlatformBadge(programmed: String?, actual: String?, modifier: Modifier = Modifier) {
-    val p = programmed?.trim().orEmpty()
-    val a = actual?.trim().orEmpty()
+    val p = platformLabel(programmed).orEmpty()
+    val a = platformLabel(actual).orEmpty()
     if (p.isEmpty() && a.isEmpty()) return
     val changed = a.isNotEmpty() && p.isNotEmpty() && a != p
     val confirmed = a.isNotEmpty()
