@@ -1,0 +1,2 @@
+Map: zoom in to see single trains, with the stretch from the last detection to the next stop (tap to open).
+Train route in three colours: travelled, in transit (dashed), still to go.

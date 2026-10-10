@@ -53,6 +53,8 @@ import io.github.andreadp.trenolibero.data.Precision
 import io.github.andreadp.trenolibero.data.RailNetwork
 import io.github.andreadp.trenolibero.data.StationGeo
 import io.github.andreadp.trenolibero.data.Tratta
+import io.github.andreadp.trenolibero.data.TrainOnMap
+import io.github.andreadp.trenolibero.data.TrainsOnMap
 import io.github.andreadp.trenolibero.data.ViaggiaTrenoApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -77,7 +79,7 @@ import org.osmdroid.views.overlay.simplefastpoint.SimplePointTheme
 object MapColors {
     const val STATION = 0xFF0D2F8C.toInt()       // blu scuro
     const val ROUTE = 0xFF0D47A1.toInt()         // blu
-    const val ROUTE_TODO = 0x730D47A1            // blu trasparente (tratto da percorrere)
+    const val ROUTE_TODO = 0xFF9E9E9E.toInt()    // grigio: tratto ancora da percorrere
     const val LINE_BUSY = 0xFFE65100.toInt()     // arancione: linea con treni in transito
     const val LINE_FREE = 0xFF757575.toInt()     // grigio
 }
@@ -198,7 +200,7 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
         for ((region, list) in sets) for (t in list) {
             val p = Polyline(map).apply {
                 setPoints(shapes[t])
-                outlinePaint.color = if (t.occupata) MapColors.LINE_BUSY else MapColors.LINE_FREE
+                outlinePaint.color = if (t.occupata && !showRegional) MapColors.LINE_BUSY else MapColors.LINE_FREE
                 outlinePaint.strokeWidth = 7f
                 outlinePaint.strokeCap = Paint.Cap.ROUND
                 infoWindow = null
@@ -208,6 +210,66 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
             lineOverlays.add(p)
         }
         map.overlays.addAll(0, lineOverlays)
+        map.invalidate()
+    }
+
+    // Da zoom 9: posizione dei treni in transito nella zona inquadrata, colorando solo il tratto
+    // tra l'ultimo rilevamento e la prossima fermata (non l'intera linea)
+    var trains by remember { mutableStateOf<List<TrainOnMap>>(emptyList()) }
+    var selectedTrain by remember { mutableStateOf<TrainOnMap?>(null) }
+    var trainsLoading by remember { mutableStateOf(false) }
+    val trainOverlays = remember { mutableListOf<Overlay>() }
+    val ctx = LocalContext.current
+    val area = viewport?.takeIf { showRegional }?.let { v ->
+        // area arrotondata: piccoli spostamenti non ricaricano i treni
+        listOf(v.zoom.toInt(), (v.box.centerLatitude * 20).toInt(), (v.box.centerLongitude * 20).toInt())
+    }
+    LaunchedEffect(area, regional, national.data != null) {
+        if (area == null) { trains = emptyList(); return@LaunchedEffect }
+        delay(700)
+        val index = state.data?.associateBy { it.codiceStazione } ?: return@LaunchedEffect
+        while (true) {
+            val box = viewport?.box ?: break
+            val visible = buildList {
+                national.data?.forEach { add(0 to it) }
+                regional.forEach { (r, l) -> l.forEach { add(r to it) } }
+            }.filter { (_, t) ->
+                box.contains(t.latitudineA, t.longitudineA) || box.contains(t.latitudineB, t.longitudineB)
+            }
+            trainsLoading = true
+            val rail = runCatching { Graph.rail() }.getOrNull()
+            trains = withContext(Dispatchers.Default) { TrainsOnMap.load(visible, index, rail) }
+            trainsLoading = false
+            delay(90_000)
+        }
+    }
+    LaunchedEffect(trains) {
+        map.overlays.removeAll(trainOverlays.toSet())
+        trainOverlays.clear()
+        val segments = trains.map { tr ->
+            Polyline(map).apply {
+                setPoints(tr.segment.map { GeoPoint(it.lat, it.lon) })
+                outlinePaint.color = MapColors.LINE_BUSY
+                outlinePaint.strokeWidth = 10f
+                outlinePaint.strokeCap = Paint.Cap.ROUND
+                infoWindow = null
+                setOnClickListener { _, _, _ -> selected = null; selectedLine = null; selectedTrain = tr; true }
+            }
+        }
+        val markers = trains.map { tr ->
+            Marker(map).apply {
+                position = GeoPoint(tr.detection.lat, tr.detection.lon)
+                icon = ContextCompat.getDrawable(ctx, R.drawable.train_pin)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                infoWindow = null
+                setOnMarkerClickListener { _, _ -> selected = null; selectedLine = null; selectedTrain = tr; true }
+            }
+        }
+        trainOverlays.addAll(segments)
+        trainOverlays.addAll(markers)
+        // sopra le linee, sotto le stazioni e i segnaposto
+        map.overlays.addAll(lineOverlays.size.coerceAtMost(map.overlays.size), segments)
+        map.overlays.addAll(markers)
         map.invalidate()
     }
 
@@ -227,7 +289,7 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
         Box(Modifier.padding(pad).fillMaxSize()) {
             AndroidView(factory = { map }, modifier = Modifier.fillMaxSize())
             OsmAttribution(Modifier.align(Alignment.BottomStart))
-            Legend(Modifier.align(Alignment.TopStart).padding(8.dp))
+            Legend(Modifier.align(Alignment.TopStart).padding(8.dp), detailed = showRegional, loading = trainsLoading)
 
             val stations = state.data
             // Da lontano solo i nodi delle linee nazionali, da vicino tutte le stazioni
@@ -292,17 +354,63 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
                 }
             }
             selectedLine?.let { sl -> LineCard(nav, sl, Modifier.align(Alignment.BottomCenter)) { selectedLine = null } }
+            selectedTrain?.let { tr ->
+                Card(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${tr.title} → ${tr.destination}", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { selectedTrain = null }) { Icon(Icons.Default.Close, "Chiudi") }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "Rilevato a ${tr.detection.detection.name} alle ${fmtTime(tr.detection.detection.time)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            DelayBadge(tr.delay)
+                        }
+                        Text("Prossima fermata: ${tr.nextStop}", style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { nav.train(tr.number, tr.originId, tr.dateMs) }) { Text("Apri il treno") }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun Legend(modifier: Modifier) {
+private fun RouteLegend() {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 4.dp)) {
+        LegendRow(Color(MapColors.ROUTE), "percorso")
+        DashedLegend()
+        LegendRow(Color(MapColors.ROUTE_TODO), "da percorrere")
+    }
+}
+
+@Composable
+private fun DashedLegend() {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            repeat(3) { Box(Modifier.size(width = 5.dp, height = 4.dp).background(Color(MapColors.ROUTE))) }
+        }
+        Text("in transito", style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun Legend(modifier: Modifier, detailed: Boolean, loading: Boolean) {
     Card(modifier) {
         Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            LegendRow(Color(MapColors.LINE_BUSY), "Treni in transito")
-            LegendRow(Color(MapColors.LINE_FREE), "Linea libera")
+            if (detailed) {
+                LegendRow(Color(MapColors.LINE_BUSY), "Treno: ultimo rilevamento → prossima fermata")
+                LegendRow(Color(MapColors.LINE_FREE), "Linea")
+            } else {
+                LegendRow(Color(MapColors.LINE_BUSY), "Linea con treni in transito")
+                LegendRow(Color(MapColors.LINE_FREE), "Linea libera")
+                Text("Avvicina per vedere i singoli treni", style = MaterialTheme.typography.labelSmall)
+            }
             LegendRow(Color(MapColors.STATION), "Stazione", dot = true)
+            if (loading) Text("Aggiornamento treni…", style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -412,15 +520,35 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
                 val legs = (0 until (pts.size - 1).coerceAtLeast(0)).map { i ->
                     segments?.getOrNull(i)?.map { GeoPoint(it.lat, it.lon) } ?: listOf(pts[i], pts[i + 1])
                 }
-                legs.forEachIndexed { i, leg ->
+                // Tre stati: già percorso (pieno), in transito teorico dall'ultimo rilevamento alla prossima fermata
+                // (tratteggiato), ancora da percorrere (grigio)
+                val lastDet = detections.lastOrNull()
+                fun line(points: List<GeoPoint>, kind: Int) {
+                    if (points.size < 2) return
                     map.overlays.add(Polyline(map).apply {
-                        setPoints(leg)
-                        outlinePaint.color = if (i < lastReachedKnown || a.arrivato == true) MapColors.ROUTE else MapColors.ROUTE_TODO
+                        setPoints(points)
+                        outlinePaint.color = if (kind == 2) MapColors.ROUTE_TODO else MapColors.ROUTE
                         outlinePaint.strokeWidth = 10f
-                        outlinePaint.strokeCap = Paint.Cap.ROUND
+                        outlinePaint.strokeCap = if (kind == 1) Paint.Cap.BUTT else Paint.Cap.ROUND
                         outlinePaint.strokeJoin = Paint.Join.ROUND
+                        if (kind == 1) outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(28f, 18f), 0f)
                         infoWindow = null
                     })
+                }
+                val running = a.arrivato != true && a.nonPartito != true && !a.cancelled
+                legs.forEachIndexed { i, leg ->
+                    when {
+                        a.arrivato == true || i < lastReachedKnown -> line(leg, 0)
+                        running && i == lastReachedKnown -> {
+                            // tratto in corso: diviso nel punto dell'ultimo rilevamento, se cade al suo interno
+                            val cut = lastDet?.takeIf { d -> DetectionLocator.normalize(d.detection.name) != DetectionLocator.normalize(known[lastReachedKnown].first.stazione) }?.let { d ->
+                                leg.indices.minBy { DetectionLocator.distanceKm(leg[it].latitude, leg[it].longitude, d.lat, d.lon) }
+                            } ?: 0
+                            line(leg.subList(0, cut + 1), 0)
+                            line(leg.subList(cut, leg.size), 1)
+                        }
+                        else -> line(leg, 2)
+                    }
                 }
                 val lastReached = a.fermate.indexOfLast { it.reached && !it.suppressed }
                 stops.forEachIndexed { i, (f, geo) ->
@@ -489,6 +617,7 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
                             }
                             if (!a.cancelled && a.nonPartito != true) DelayBadge(a.ritardo)
                         }
+                        RouteLegend()
                         if (segments != null && segments.any { it == null }) {
                             Text("Alcuni tratti in linea retta (binari non trovati)", style = MaterialTheme.typography.labelSmall)
                         }

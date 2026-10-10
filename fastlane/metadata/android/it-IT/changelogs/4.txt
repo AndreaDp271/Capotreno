@@ -1,0 +1,2 @@
+Mappa: avvicinando si vedono i singoli treni, con il tratto tra l'ultimo rilevamento e la prossima fermata (tocca il treno per aprirlo).
+Percorso del treno in tre colori: già percorso, in transito (tratteggiato), da percorrere.
