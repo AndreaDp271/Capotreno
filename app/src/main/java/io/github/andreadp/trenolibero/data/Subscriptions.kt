@@ -50,6 +50,9 @@ data class Subscription(
     val holder: String = "",
     /** Biglietto importato (PDF, immagine o scansione) con il codice da mostrare al controllore. */
     val ticketId: String? = null,
+    /** Orari abituali "HH:mm" (vuoti = non indicati), per gli avvisi sui treni dell'abbonamento. */
+    val outboundTime: String = "",
+    val returnTime: String = "",
 ) {
     private fun parse(s: String): Long? = runCatching {
         SimpleDateFormat("dd/MM/yyyy", Locale.ITALY).apply { timeZone = ViaggiaTrenoApi.ROME; isLenient = false }.parse(s)?.time

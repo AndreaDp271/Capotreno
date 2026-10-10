@@ -50,7 +50,32 @@ class NotifySettings(context: Context) {
         get() = p.getInt("reminderMinutes", 30)
         set(v) = p.edit().putInt("reminderMinutes", v).apply()
 
-    val anyEnabled get() = favorites || tickets || strikes || subscriptions
+    /** Riepilogo partenze a orario fisso. */
+    var digest: Boolean
+        get() = p.getBoolean("digest", false)
+        set(v) = p.edit().putBoolean("digest", v).apply()
+    var digestStation: String          // "id|nome"
+        get() = p.getString("digestStation", "")!!
+        set(v) = p.edit().putString("digestStation", v).apply()
+    var digestDestination: String      // "id|nome" o vuoto
+        get() = p.getString("digestDestination", "")!!
+        set(v) = p.edit().putString("digestDestination", v).apply()
+    var digestTime: String             // "HH:mm"
+        get() = p.getString("digestTime", "07:30")!!
+        set(v) = p.edit().putString("digestTime", v).apply()
+    var digestWeekdays: Boolean
+        get() = p.getBoolean("digestWeekdays", true)
+        set(v) = p.edit().putBoolean("digestWeekdays", v).apply()
+    /** Disagi di circolazione sulle località di abbonamenti e preferiti. */
+    var disruptions: Boolean
+        get() = p.getBoolean("disruptions", false)
+        set(v) = p.edit().putBoolean("disruptions", v).apply()
+    /** Ritardi/soppressioni dei treni compatibili con l'abbonamento negli orari abituali. */
+    var subscriptionTrains: Boolean
+        get() = p.getBoolean("subscriptionTrains", false)
+        set(v) = p.edit().putBoolean("subscriptionTrains", v).apply()
+
+    val anyEnabled get() = favorites || tickets || strikes || subscriptions || digest || disruptions || subscriptionTrains
 }
 
 /**
@@ -62,6 +87,9 @@ object Notifier {
     const val CH_TICKETS = "biglietti"
     const val CH_STRIKES = "scioperi"
     const val CH_SUBS = "abbonamenti"
+    const val CH_ALARMS = "sveglia"
+    const val CH_DIGEST = "riepilogo"
+    const val CH_DISRUPTIONS = "disagi"
     private const val WORK = "monitor"
 
     const val EXTRA_TRAIN = "open_train"       // "numero|origine|dataMs"
@@ -79,7 +107,13 @@ object Notifier {
             NotificationChannel(CH_STRIKES, "Scioperi", NotificationManager.IMPORTANCE_DEFAULT)
                 .apply { description = "Nuovi scioperi annunciati" },
             NotificationChannel(CH_SUBS, "Abbonamenti", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Scadenza degli abbonamenti" },
+                .apply { description = "Scadenza degli abbonamenti e treni negli orari abituali" },
+            NotificationChannel(CH_ALARMS, "Sveglia fermata", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "Avviso prima di arrivare alla tua fermata" },
+            NotificationChannel(CH_DIGEST, "Riepilogo partenze", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Prossimi treni dalla stazione scelta, a orario fisso" },
+            NotificationChannel(CH_DISRUPTIONS, "Disagi sulle tue linee", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Guasti e rallentamenti nelle località dei tuoi viaggi" },
         ).forEach { nm.createNotificationChannel(it) }
     }
 
@@ -129,6 +163,9 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         if (settings.favorites) runCatching { checkFavorites() }
         if (settings.strikes) runCatching { checkStrikes() }
         if (settings.subscriptions) runCatching { checkSubscriptions() }
+        if (settings.digest) runCatching { checkDigest() }
+        if (settings.disruptions) runCatching { checkDisruptions() }
+        if (settings.subscriptionTrains) runCatching { checkSubscriptionTrains() }
         return Result.success()
     }
 
@@ -220,6 +257,120 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         news.filter { categorize(it, false) == InfoCategory.STRIKE }.take(3).forEach { n ->
             if (once("strike:${n.title.hashCode()}")) {
                 Notifier.notify(applicationContext, Notifier.CH_STRIKES, n.title.hashCode(), "Sciopero", n.title, Notifier.EXTRA_INFO to "1")
+            }
+        }
+    }
+
+    private fun minutesOfDay(hhmm: String): Int? =
+        hhmm.split(":").takeIf { it.size == 2 }?.let { (h, m) -> h.toIntOrNull()?.let { hh -> m.toIntOrNull()?.let { hh * 60 + it } } }
+
+    private fun nowCal() = java.util.Calendar.getInstance(ViaggiaTrenoApi.ROME)
+
+    /** Riepilogo dei prossimi treni dalla stazione scelta, una volta al giorno all'orario impostato. */
+    private suspend fun checkDigest() {
+        val (sid, sname) = settings.digestStation.split("|", limit = 2).takeIf { it.size == 2 } ?: return
+        val target = minutesOfDay(settings.digestTime) ?: return
+        val cal = nowCal()
+        val dow = cal.get(java.util.Calendar.DAY_OF_WEEK)
+        if (settings.digestWeekdays && (dow == java.util.Calendar.SATURDAY || dow == java.util.Calendar.SUNDAY)) return
+        val nowMin = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+        if (nowMin < target || nowMin > target + 40) return
+        val day = "%04d%02d%02d".format(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
+        if (state.getBoolean("digest:$day", false)) return
+        val dest = settings.digestDestination.split("|", limit = 2).takeIf { it.size == 2 }
+        val lines = if (dest != null) {
+            JourneySearch.direct(StationRef(sid, sname), StationRef(dest[0], dest[1]), Date()).sortedBy { it.departure }.take(5).map { j ->
+                val l = j.legs.single()
+                buildString {
+                    append("${hm(l.departure)} ${l.title}")
+                    j.platform?.takeIf { it.isNotBlank() }?.let { append(" · bin. $it") }
+                    when {
+                        j.cancelled -> append(" · SOPPRESSO")
+                        (j.delay ?: 0) > 0 -> append(" · +${j.delay} min")
+                    }
+                }
+            }
+        } else {
+            ViaggiaTrenoApi.departures(sid).take(6).map { e ->
+                buildString {
+                    append("${hm(e.orarioPartenza)} ${e.title} → ${e.destinazione.orEmpty()}")
+                    (e.binarioEffettivoPartenzaDescrizione ?: e.binarioProgrammatoPartenzaDescrizione)?.takeIf { it.isNotBlank() }?.let { append(" · bin. $it") }
+                    when {
+                        e.provvedimento == 1 -> append(" · SOPPRESSO")
+                        (e.ritardo ?: 0) > 0 && e.nonPartito != true -> append(" · +${e.ritardo} min")
+                    }
+                }
+            }
+        }
+        if (lines.isEmpty()) return
+        state.edit().putBoolean("digest:$day", true).apply()
+        Notifier.notify(
+            applicationContext, Notifier.CH_DIGEST, "digest".hashCode(),
+            "Prossimi treni da $sname" + (dest?.let { " per ${it[1]}" } ?: ""),
+            lines.joinToString("\n"),
+        )
+    }
+
+    /** Località dei viaggi dell'utente: prima parola del nome delle stazioni (es. "PADOVA", "CASTELFRANCO"). */
+    private fun userPlaces(): Set<String> {
+        val names = Graph.subscriptions.items.value.flatMap { listOf(it.fromName, it.toName) } +
+            Graph.favorites.stations.value.map { it.name } +
+            Graph.favorites.trains.value.flatMap { t ->
+                // etichetta "FR 9600 MILANO CENTRALE → TORINO PORTA NUOVA": si toglie la sigla del treno
+                t.label.split("→").mapIndexed { i, part -> if (i == 0) part.trim().split(" ").drop(2).joinToString(" ") else part.trim() }
+            }
+        return names.map { DetectionLocator.normalize(it).split(" ").firstOrNull().orEmpty() }
+            .filter { it.length >= 4 }.toSet()
+    }
+
+    /** Avvisi di circolazione che citano le località dei tuoi viaggi. */
+    private suspend fun checkDisruptions() {
+        val places = userPlaces()
+        if (places.isEmpty()) return
+        ViaggiaTrenoApi.infomobility(works = false)
+            .filter { categorize(it, false) == InfoCategory.CIRCULATION }
+            .filter { n -> !n.title.lowercase().contains("regolare") }
+            .filter { n ->
+                val words = DetectionLocator.normalize(n.title + " " + android.text.Html.fromHtml(n.html, 0)).split(" ").toSet()
+                places.any { it in words }
+            }
+            .take(3)
+            .forEach { n ->
+                if (once("disr:${n.title.hashCode()}")) {
+                    Notifier.notify(applicationContext, Notifier.CH_DISRUPTIONS, n.title.hashCode(), "Disagi sulla tua linea", n.title, Notifier.EXTRA_INFO to "1")
+                }
+            }
+    }
+
+    /** Treni compatibili con gli abbonamenti attivi intorno agli orari abituali: ritardi e soppressioni. */
+    private suspend fun checkSubscriptionTrains() {
+        val cal = nowCal()
+        val nowMin = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+        val midnight = System.currentTimeMillis() - nowMin * 60_000L - cal.get(java.util.Calendar.SECOND) * 1000L
+        for (s in Graph.subscriptions.items.value.filter { it.isActive() }) {
+            for ((time, reverse) in listOf(s.outboundTime to false, s.returnTime to true)) {
+                val t = minutesOfDay(time) ?: continue
+                if (nowMin < t - 60 || nowMin > t + 40) continue
+                val center = midnight + t * 60_000L
+                val trains = compatibleTrains(s, reverse, Date(maxOf(System.currentTimeMillis(), center - 40 * 60_000L))).compatible
+                    .filter { it.departure in (center - 40 * 60_000L)..(center + 40 * 60_000L) }
+                for (j in trains) {
+                    val l = j.legs.single()
+                    val key = "subtr:${l.number}:${l.dateMs}"
+                    val extra = Notifier.EXTRA_TRAIN to "${l.number}|${l.originId}|${l.dateMs}"
+                    val route = "${l.from} → ${l.to}, partenza ${hm(l.departure)}"
+                    if (j.cancelled) {
+                        if (once("$key:cancel")) Notifier.notify(applicationContext, Notifier.CH_SUBS, key.hashCode(), "${l.title} soppresso", route, extra)
+                        continue
+                    }
+                    val delay = j.delay ?: continue
+                    val last = state.getInt("$key:delay", Int.MIN_VALUE)
+                    if (delay >= settings.delayThreshold && (last == Int.MIN_VALUE || delay - last >= 5)) {
+                        state.edit().putInt("$key:delay", delay).apply()
+                        Notifier.notify(applicationContext, Notifier.CH_SUBS, key.hashCode(), "${l.title}: +$delay min",
+                            route + (j.platform?.let { " · binario $it" } ?: ""), extra)
+                    }
+                }
             }
         }
     }

@@ -290,6 +290,12 @@ fun SubscriptionDialog(initial: Subscription?, title: String? = null, onDismiss:
     var validFrom by remember { mutableStateOf(initial?.validFrom ?: Subscription.formatDate(System.currentTimeMillis())) }
     var validTo by remember { mutableStateOf(initial?.validTo.orEmpty()) }
     var holder by remember { mutableStateOf(initial?.holder.orEmpty()) }
+    var outbound by remember { mutableStateOf(initial?.outboundTime.orEmpty()) }
+    var back by remember { mutableStateOf(initial?.returnTime.orEmpty()) }
+    fun pickTime(current: String, set: (String) -> Unit) {
+        val (h, m) = current.split(":").map { it.toIntOrNull() ?: 0 }.let { if (it.size == 2) it else listOf(8, 0) }
+        android.app.TimePickerDialog(ctx, { _, hh, mm -> set("%02d:%02d".format(hh, mm)) }, h, m, true).show()
+    }
 
     fun pick(current: String, set: (String) -> Unit) {
         val cal = Calendar.getInstance(ViaggiaTrenoApi.ROME)
@@ -325,6 +331,14 @@ fun SubscriptionDialog(initial: Subscription?, title: String? = null, onDismiss:
                     TextButton(onClick = { validTo = Subscription.formatDate(Subscription.endAfter(startMs(), 12)) }) { Text("Annuale") }
                 }
                 OutlinedTextField(holder, { holder = it }, label = { Text("Intestatario (facoltativo)") }, singleLine = true)
+                Text("Orari abituali (per gli avvisi sui treni dell'abbonamento)", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AssistChip(onClick = { pickTime(outbound) { outbound = it } }, label = { Text(if (outbound.isEmpty()) "Andata: —" else "Andata ~$outbound") })
+                    AssistChip(onClick = { pickTime(back) { back = it } }, label = { Text(if (back.isEmpty()) "Ritorno: —" else "Ritorno ~$back") })
+                }
+                if (outbound.isNotEmpty() || back.isNotEmpty()) {
+                    TextButton(onClick = { outbound = ""; back = "" }) { Text("Rimuovi orari") }
+                }
             }
         },
         confirmButton = {
@@ -334,6 +348,7 @@ fun SubscriptionDialog(initial: Subscription?, title: String? = null, onDismiss:
                     (initial ?: Subscription(Subscription.newId(), "", "", "", "", "")).copy(
                         name = name.trim(), fromId = a.id, fromName = a.name, toId = b.id, toName = b.name,
                         type = type, operator = operator, validFrom = validFrom, validTo = validTo, holder = holder.trim(),
+                        outboundTime = outbound, returnTime = back,
                     )
                 )
             }) { Text("Salva") }

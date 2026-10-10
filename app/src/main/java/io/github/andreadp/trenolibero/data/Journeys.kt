@@ -65,6 +65,7 @@ data class Journey(
     /** Dati in tempo reale (solo per i diretti letti da ViaggiaTreno). */
     val delay: Int? = null,
     val platform: String? = null,
+    val cancelled: Boolean = false,
 ) {
     val departure get() = legs.first().departure
     val arrival get() = legs.last().arrival
@@ -201,7 +202,7 @@ object JourneySearch {
         val boards = (0..1).map { i ->
             async { runCatching { ViaggiaTrenoApi.departures(from.id, Date(time.time + i * 90 * 60_000L)) }.getOrDefault(emptyList()) }
         }.awaitAll().flatten().distinctBy { "${it.numeroTreno}/${it.codOrigine}" }
-            .filter { it.codOrigine != null && it.dataPartenzaTreno != null && it.provvedimento != 1 }
+            .filter { it.codOrigine != null && it.dataPartenzaTreno != null }
             .take(60)
         val sem = Semaphore(6)
         boards.map { e ->
@@ -227,6 +228,7 @@ object JourneySearch {
                             listOf(leg),
                             delay = a.ritardo.takeIf { a.nonPartito != true },
                             platform = fa.binarioEffettivoPartenzaDescrizione ?: fa.binarioProgrammatoPartenzaDescrizione,
+                            cancelled = e.provvedimento == 1 || a.cancelled,
                         )
                     }.getOrNull()
                 }

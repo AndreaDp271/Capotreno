@@ -15,7 +15,8 @@ Client Android libero e **non ufficiale** dei dati in tempo reale di
 - **Abbonamenti**: tratta, tipo, operatore e validità (con avviso di scadenza), QR allegato da mostrare al controllore,
   treni diretti compatibili in tempo reale nei due sensi
 - **Notifiche** attivabili (controllo locale con WorkManager, nessun push esterno): promemoria e variazioni del treno
-  del biglietto, ritardi/binari/soppressioni dei treni preferiti, nuovi scioperi, scadenza abbonamenti
+  del biglietto, ritardi/binari/soppressioni dei treni preferiti, nuovi scioperi, scadenza abbonamenti, sveglia prima della
+  fermata, riepilogo partenze a orario fisso, disagi sulle proprie linee, treni dell'abbonamento negli orari abituali
 - **Infomobilità**: avvisi divisi per circolazione, scioperi, lavori (per regione), altre info; treni in circolazione
 - **Preferiti** salvati solo sul dispositivo
 - Nessuna dipendenza proprietaria: niente Google Play Services, niente tracciamento

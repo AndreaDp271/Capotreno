@@ -44,6 +44,13 @@ fun SettingsScreen(nav: Nav) {
     var tickets by remember { mutableStateOf(settings.tickets) }
     var strikes by remember { mutableStateOf(settings.strikes) }
     var subs by remember { mutableStateOf(settings.subscriptions) }
+    var digest by remember { mutableStateOf(settings.digest) }
+    var digestStation by remember { mutableStateOf(settings.digestStation) }
+    var digestDest by remember { mutableStateOf(settings.digestDestination) }
+    var digestTime by remember { mutableStateOf(settings.digestTime) }
+    var digestWeekdays by remember { mutableStateOf(settings.digestWeekdays) }
+    var disruptions by remember { mutableStateOf(settings.disruptions) }
+    var subTrains by remember { mutableStateOf(settings.subscriptionTrains) }
     var threshold by remember { mutableFloatStateOf(settings.delayThreshold.toFloat()) }
     var reminder by remember { mutableFloatStateOf(settings.reminderMinutes.toFloat()) }
     var denied by remember { mutableStateOf(false) }
@@ -90,6 +97,42 @@ fun SettingsScreen(nav: Nav) {
             SettingSwitch("Scadenza abbonamenti", "7, 3 e 1 giorno prima e il giorno della scadenza", subs) {
                 toggle(it) { v -> settings.subscriptions = v; subs = v }
             }
+            SettingSwitch("Treni dell'abbonamento", "Ritardi e soppressioni dei treni compatibili intorno agli orari abituali indicati nell'abbonamento", subTrains) {
+                toggle(it) { v -> settings.subscriptionTrains = v; subTrains = v }
+            }
+            SettingSwitch("Disagi sulle tue linee", "Guasti e rallentamenti che riguardano le località di abbonamenti, stazioni e treni preferiti", disruptions) {
+                toggle(it) { v -> settings.disruptions = v; disruptions = v }
+            }
+            SettingSwitch("Riepilogo partenze", "Ogni giorno all'orario scelto, i prossimi treni dalla tua stazione", digest) {
+                toggle(it) { v -> settings.digest = v; digest = v }
+            }
+            if (digest) {
+                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+                    fun ref(s: String) = s.split("|", limit = 2).takeIf { it.size == 2 }?.let { io.github.andreadp.trenolibero.data.StationRef(it[0], it[1]) }
+                    StationField("Stazione", ref(digestStation)) { s ->
+                        digestStation = s?.let { "${it.id}|${it.name}" }.orEmpty(); settings.digestStation = digestStation
+                    }
+                    StationField("Destinazione (facoltativa)", ref(digestDest)) { s ->
+                        digestDest = s?.let { "${it.id}|${it.name}" }.orEmpty(); settings.digestDestination = digestDest
+                    }
+                    androidx.compose.foundation.layout.Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                    ) {
+                        androidx.compose.material3.AssistChip(
+                            onClick = {
+                                val (h, m) = digestTime.split(":").map { it.toIntOrNull() ?: 0 }
+                                android.app.TimePickerDialog(ctx, { _, hh, mm ->
+                                    digestTime = "%02d:%02d".format(hh, mm); settings.digestTime = digestTime
+                                }, h, m, true).show()
+                            },
+                            label = { Text("Alle $digestTime") },
+                        )
+                        Text("Solo giorni feriali")
+                        Switch(checked = digestWeekdays, onCheckedChange = { digestWeekdays = it; settings.digestWeekdays = it })
+                    }
+                }
+            }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SectionTitle("Avvisa per ritardi da ${threshold.toInt()} minuti")
             Slider(
@@ -105,7 +148,8 @@ fun SettingsScreen(nav: Nav) {
             )
             Text(
                 "I controlli avvengono sul telefono circa ogni 15 minuti, solo con connessione e solo se hai attivato " +
-                    "almeno una notifica (nessun server esterno). Android può ritardarli in risparmio energetico.",
+                    "almeno una notifica (nessun server esterno). Android può ritardarli in risparmio energetico.\n\n" +
+                    "La sveglia prima della fermata si imposta dalla schermata del treno (icona della campanella).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),

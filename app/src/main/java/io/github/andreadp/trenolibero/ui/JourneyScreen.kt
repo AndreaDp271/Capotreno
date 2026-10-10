@@ -368,7 +368,12 @@ fun JourneyCard(nav: Nav, j: Journey, buy: Boolean = true) {
                 Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     j.legs.forEach { CategoryBadge(it) }
-                    if (j.delay != null) DelayBadge(j.delay)
+                    if (j.cancelled) {
+                        Surface(color = Palette.veryLate, shape = RoundedCornerShape(6.dp)) {
+                            Text("SOPPRESSO", color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                    } else if (j.delay != null) DelayBadge(j.delay)
                     j.platform?.let { PlatformBadge(it, null) }
                 }
                 j.price?.let {
