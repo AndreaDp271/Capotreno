@@ -2,10 +2,8 @@ package io.github.andreadp.trenolibero.ui
 
 import android.app.Activity
 import android.graphics.Bitmap
-import android.graphics.Color as AColor
-import android.graphics.pdf.PdfRenderer
+import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.ParcelFileDescriptor
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -18,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -27,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -54,8 +54,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import io.github.andreadp.trenolibero.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,11 +66,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.andreadp.trenolibero.data.Graph
 import io.github.andreadp.trenolibero.data.Ticket
+import io.github.andreadp.trenolibero.data.TicketCode
 import io.github.andreadp.trenolibero.data.TicketTrain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -92,11 +95,18 @@ fun TicketsScreen(nav: Nav) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("Biglietti") }) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { picker.launch(arrayOf("application/pdf")) },
-                icon = { Icon(Icons.Default.Add, null) },
-                text = { Text("Importa PDF") },
-            )
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ExtendedFloatingActionButton(
+                    onClick = { nav.scan() },
+                    icon = { Icon(painterResource(R.drawable.ic_qr_scan), null) },
+                    text = { Text("Scansiona") },
+                )
+                ExtendedFloatingActionButton(
+                    onClick = { picker.launch(arrayOf("application/pdf", "image/*")) },
+                    icon = { Icon(Icons.Default.Add, null) },
+                    text = { Text("Importa file") },
+                )
+            }
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
@@ -104,9 +114,10 @@ fun TicketsScreen(nav: Nav) {
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
             if (tickets.isEmpty()) {
                 EmptyText(
-                    "Importa il PDF del biglietto (Trenitalia, Italo, regionale…) oppure condividilo con TrenoLibero " +
-                        "dall'app di posta.\n\nL'app riconosce treno, data, stazioni, carrozza e posto, ti porta " +
-                        "all'andamento del treno e mostra il biglietto al controllore. Tutto resta sul telefono."
+                    "Importa il biglietto in PDF (Trenitalia, Italo, regionale…) oppure uno screenshot o una foto, " +
+                        "anche condividendolo con TrenoLibero dall'app di posta o dalla galleria.\n\n" +
+                        "L'app estrae il QR code da mostrare al controllore, riconosce treno, data, stazioni, " +
+                        "carrozza e posto (dai PDF) e ti porta all'andamento del treno. Tutto resta sul telefono."
                 )
             }
             LazyColumn(Modifier.fillMaxSize()) {
@@ -155,7 +166,15 @@ fun TicketScreen(nav: Nav, id: String) {
     var editing by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf<Bitmap?>(null) }
-    val pages = rememberLoader(id) { renderPdf(Graph.tickets.pdf(id)) }
+    val scope = rememberCoroutineScope()
+    val pages = rememberLoader(id) { withContext(Dispatchers.IO) { ticketPages(id) } }
+    // Codice da mostrare al controllore: salvato all'importazione, altrimenti cercato ora
+    val code = rememberLoader(id) {
+        withContext(Dispatchers.IO) {
+            val f = Graph.tickets.code(id)
+            if (f.exists()) BitmapFactory.decodeFile(f.path) else Graph.tickets.findCode(id)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -165,6 +184,11 @@ fun TicketScreen(nav: Nav, id: String) {
                     IconButton(onClick = { nav.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro") }
                 },
                 actions = {
+                    if (t?.kind == "pdf") {
+                        IconButton(onClick = { scope.launch { runCatching { Graph.tickets.reparse(id, Graph.stations) } } }) {
+                            Icon(Icons.Default.Refresh, "Rileggi i dati dal PDF")
+                        }
+                    }
                     IconButton(onClick = { editing = true }) { Icon(Icons.Default.Edit, "Modifica") }
                     IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Elimina") }
                 },
@@ -175,6 +199,7 @@ fun TicketScreen(nav: Nav, id: String) {
             EmptyText("Biglietto non trovato"); return@Scaffold
         }
         LazyColumn(Modifier.padding(pad).fillMaxSize()) {
+            item { CodeSection(code, t, onShow = { fullscreen = it }, fallback = pages.data?.firstOrNull()) }
             item {
                 Card(
                     Modifier.fillMaxWidth().padding(16.dp),
@@ -188,7 +213,8 @@ fun TicketScreen(nav: Nav, id: String) {
                         Field("PNR / codice", t.pnr); Field("Passeggero", t.passenger)
                         if (t.trains.isEmpty() && t.from.isEmpty() && t.date.isEmpty()) {
                             Text(
-                                "Non sono riuscito a riconoscere i dati: tocca la matita per inserirli.",
+                                if (t.isImage || t.isScan) "Dal codice non si leggono i dati del viaggio: tocca la matita per inserire treno e data."
+                                else "Non sono riuscito a riconoscere i dati: tocca la matita per inserirli.",
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -204,10 +230,10 @@ fun TicketScreen(nav: Nav, id: String) {
                     ) { Text("Segui il treno ${"${tr.category} ${tr.number}".trim()}") }
                 }
             }
-            item { SectionTitle("Biglietto") }
-            item {
+            if (!t.isScan) item { SectionTitle(if (t.isImage) "Immagine" else "Biglietto") }
+            if (!t.isScan) item {
                 Text(
-                    "Tocca una pagina per mostrarla a schermo intero, con la luminosità al massimo.",
+                    "Tocca per mostrarlo a schermo intero, con la luminosità al massimo.",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
@@ -223,6 +249,7 @@ fun TicketScreen(nav: Nav, id: String) {
                     )
                 }
                 pages.error != null -> item { EmptyText(pages.error) }
+                t.isScan -> Unit
                 else -> item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp)) }
             }
         }
@@ -268,7 +295,9 @@ private fun FullscreenPage(b: Bitmap, onClose: () -> Unit) {
                 b.asImageBitmap(),
                 contentDescription = "Biglietto",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(8.dp),
+                // nessun filtro: i moduli del codice restano netti anche ingranditi
+                filterQuality = FilterQuality.None,
+                modifier = Modifier.fillMaxSize().padding(24.dp),
             )
         }
     }
@@ -321,17 +350,54 @@ private fun EditTicketDialog(t: Ticket, onDismiss: () -> Unit, onSave: (Ticket) 
     )
 }
 
-/** Rende le pagine del PDF in immagini (PdfRenderer di sistema), ad alta risoluzione per i codici QR/Aztec. */
-private suspend fun renderPdf(file: File): List<Bitmap> = withContext(Dispatchers.IO) {
-    ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-        PdfRenderer(fd).use { r ->
-            (0 until minOf(r.pageCount, 6)).map { i ->
-                r.openPage(i).use { p ->
-                    val width = 1400
-                    val height = (width.toFloat() * p.height / p.width).toInt()
-                    Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { b ->
-                        b.eraseColor(AColor.WHITE)
-                        p.render(b, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+/** Pagine da mostrare: PDF renderizzato oppure l'immagine importata (nessuna per i codici scansionati). */
+private fun ticketPages(id: String): List<Bitmap> {
+    val t = Graph.tickets.get(id)
+    if (t?.isScan == true) return emptyList()
+    return if (t?.isImage == true) {
+        listOfNotNull(BitmapFactory.decodeFile(Graph.tickets.image(id).path, BitmapFactory.Options().apply { inSampleSize = 2 }))
+    } else {
+        TicketCode.renderPdf(Graph.tickets.pdf(id), 1400)
+    }
+}
+
+/** Il codice del biglietto in evidenza, con il pulsante per mostrarlo al controllore. */
+@Composable
+private fun CodeSection(code: Loaded<Bitmap?>, t: Ticket, onShow: (Bitmap) -> Unit, fallback: Bitmap?) {
+    val bmp = code.data
+    Card(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            when {
+                bmp != null -> {
+                    Image(
+                        bmp.asImageBitmap(),
+                        contentDescription = "Codice del biglietto",
+                        filterQuality = FilterQuality.None,
+                        modifier = Modifier.size(220.dp).clickable { onShow(bmp) },
+                    )
+                    Button(onClick = { onShow(bmp) }, modifier = Modifier.padding(top = 8.dp)) { Text("Mostra al controllore") }
+                    val fmt = when (t.codeFormat) {
+                        "QR_CODE" -> "QR code"
+                        "AZTEC" -> "Codice Aztec"
+                        "PDF_417" -> "Codice PDF417"
+                        "DATA_MATRIX" -> "DataMatrix"
+                        else -> ""
+                    }
+                    if (fmt.isNotEmpty()) Text(fmt, color = Color.DarkGray, style = MaterialTheme.typography.labelSmall)
+                }
+                code.loading -> {
+                    Text("Ricerca del codice…", color = Color.DarkGray)
+                    LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp))
+                }
+                else -> {
+                    Text("Nessun QR code trovato nel biglietto", color = Color.DarkGray)
+                    if (fallback != null) {
+                        Button(onClick = { onShow(fallback) }, modifier = Modifier.padding(top = 8.dp)) {
+                            Text("Mostra il biglietto intero")
+                        }
                     }
                 }
             }

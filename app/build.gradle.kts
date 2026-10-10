@@ -22,8 +22,8 @@ android {
         applicationId = "io.github.andreadp.trenolibero"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     signingConfigs {
@@ -58,7 +58,10 @@ android {
         buildConfig = true
     }
     testOptions {
-        unitTests.all { it.environment("LIVE_API", System.getenv("LIVE_API") ?: "") }
+        unitTests.all {
+            it.environment("LIVE_API", System.getenv("LIVE_API") ?: "")
+            it.environment("TICKET_IMG", System.getenv("TICKET_IMG") ?: "")
+        }
     }
     dependenciesInfo {
         // F-Droid: niente blob di metadati dipendenze firmato da Google
@@ -81,6 +84,11 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("androidx.camera:camera-camera2:1.4.0")
+    implementation("androidx.camera:camera-lifecycle:1.4.0")
+    implementation("androidx.camera:camera-view:1.4.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 
     testImplementation("junit:junit:4.13.2")
 }

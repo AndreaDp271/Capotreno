@@ -50,10 +50,13 @@ import io.github.andreadp.trenolibero.data.DetectionLocator
 import io.github.andreadp.trenolibero.data.Graph
 import io.github.andreadp.trenolibero.data.LatLon
 import io.github.andreadp.trenolibero.data.Precision
+import io.github.andreadp.trenolibero.data.RailNetwork
 import io.github.andreadp.trenolibero.data.StationGeo
 import io.github.andreadp.trenolibero.data.Tratta
 import io.github.andreadp.trenolibero.data.ViaggiaTrenoApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
@@ -136,7 +139,8 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
     val map = rememberMapView()
     var selected by remember { mutableStateOf<StationGeo?>(null) }
     var selectedLine by remember { mutableStateOf<SelectedLine?>(null) }
-    var viewport by remember { mutableStateOf<Viewport?>(null) }
+    var viewport by remember { mutableStateOf<Viewport?>(if (focusId != null) Viewport(14.0, BoundingBox()) else null) }
+    var focusDone by remember { mutableStateOf(false) }
     // Linee nazionali (regione 0), aggiornate ogni 2 minuti
     val national = rememberLoader(Unit, refreshMs = 120_000) { ViaggiaTrenoApi.lines(0) }
     var regional by remember { mutableStateOf<Map<Int, List<Tratta>>>(emptyMap()) }
@@ -173,19 +177,27 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
         if (updated != regional) regional = updated
     }
 
-    // Disegno delle linee (sotto le stazioni)
+    // Disegno delle linee (sotto le stazioni), sul tracciato reale dei binari OSM
     val showRegional = (viewport?.zoom ?: 6.0) >= 9
     LaunchedEffect(national.data, regional, showRegional, state.data) {
         val names = state.data?.associateBy({ it.codiceStazione }, { it.name }).orEmpty()
-        map.overlays.removeAll(lineOverlays.toSet())
-        lineOverlays.clear()
         val sets = buildList {
             national.data?.let { add(0 to it) }
             if (showRegional) regional.forEach { (r, l) -> add(r to l) }
         }
+        val rail = runCatching { Graph.rail() }.getOrNull()
+        val shapes = withContext(Dispatchers.Default) {
+            sets.flatMap { (_, list) -> list }.associate { t ->
+                val a = LatLon(t.latitudineA, t.longitudineA)
+                val b = LatLon(t.latitudineB, t.longitudineB)
+                t to (rail?.path(t.nodoA, a, t.nodoB, b) ?: listOf(a, b)).map { GeoPoint(it.lat, it.lon) }
+            }
+        }
+        map.overlays.removeAll(lineOverlays.toSet())
+        lineOverlays.clear()
         for ((region, list) in sets) for (t in list) {
             val p = Polyline(map).apply {
-                setPoints(listOf(GeoPoint(t.latitudineA, t.longitudineA), GeoPoint(t.latitudineB, t.longitudineB)))
+                setPoints(shapes[t])
                 outlinePaint.color = if (t.occupata) MapColors.LINE_BUSY else MapColors.LINE_FREE
                 outlinePaint.strokeWidth = 7f
                 outlinePaint.strokeCap = Paint.Cap.ROUND
@@ -218,13 +230,17 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
             Legend(Modifier.align(Alignment.TopStart).padding(8.dp))
 
             val stations = state.data
-            LaunchedEffect(stations) {
+            // Da lontano solo i nodi delle linee nazionali, da vicino tutte le stazioni
+            val detailed = (viewport?.zoom ?: 6.0) >= 8.5
+            val hubs = national.data?.flatMap { listOfNotNull(it.nodoA, it.nodoB) }?.toSet()
+            LaunchedEffect(stations, detailed, hubs) {
                 if (stations == null) return@LaunchedEffect
+                val shown = if (detailed || hubs == null) stations else stations.filter { it.codiceStazione in hubs }
                 map.overlays.removeAll { it is SimpleFastPointOverlay }
-                val points = stations.map { LabelledGeoPoint(it.lat, it.lon, it.name) }
+                val points = shown.map { LabelledGeoPoint(it.lat, it.lon, it.name) }
                 val opts = SimpleFastPointOverlayOptions.getDefaultStyle()
                     .setAlgorithm(SimpleFastPointOverlayOptions.RenderingAlgorithm.MAXIMUM_OPTIMIZATION)
-                    .setRadius(8f)
+                    .setRadius(if (detailed) 8f else 7f)
                     .setIsClickable(true)
                     .setCellSize(14)
                     .setSymbol(SimpleFastPointOverlayOptions.Shape.CIRCLE)
@@ -236,15 +252,16 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
                     })
                     .setMinZoomShowLabels(11)
                 val overlay = SimpleFastPointOverlay(SimplePointTheme(points, true), opts)
-                overlay.setOnClickListener { _, i -> selectedLine = null; selected = stations[i] }
+                overlay.setOnClickListener { _, i -> selectedLine = null; selected = shown[i] }
                 map.overlays.add(overlay)
-                focusId?.let { id ->
-                    val i = stations.indexOfFirst { it.codiceStazione == id }
+                if (focusId != null && !focusDone) {
+                    focusDone = true
+                    val i = shown.indexOfFirst { it.codiceStazione == focusId }
                     if (i >= 0) {
-                        selected = stations[i]
+                        selected = shown[i]
                         overlay.selectedPoint = i
                         map.controller.setZoom(14.0)
-                        map.controller.setCenter(GeoPoint(stations[i].lat, stations[i].lon))
+                        map.controller.setCenter(GeoPoint(shown[i].lat, shown[i].lon))
                     }
                 }
                 map.invalidate()
@@ -336,6 +353,15 @@ private fun LineCard(nav: Nav, sl: SelectedLine, modifier: Modifier, onClose: ()
 
 // ---------------- Mappa percorso treno ----------------
 
+/** Frecce, Italo ed Eurostar usano l'alta velocità; regionali e Intercity no. */
+fun railProfile(title: String): RailNetwork.Profile {
+    val cat = title.trim().substringBefore(' ').uppercase()
+    return when (cat) {
+        "FR", "FA", "ITA", "AV", "ES", "ES*" -> RailNetwork.Profile.HIGH_SPEED
+        else -> RailNetwork.Profile.REGIONAL
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
@@ -350,9 +376,10 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
     // Traccia sui binari OSM: dipende solo dalla sequenza delle fermate
     val knownStops = state.data?.second?.mapNotNull { it.second }
     val stopKey = knownStops?.joinToString(",") { it.codiceStazione }
-    val route = rememberLoader(stopKey) {
-        val pts = knownStops.orEmpty().map { LatLon(it.lat, it.lon) }
-        if (pts.size >= 2) Graph.router.route(pts) else emptyList()
+    val profile = state.data?.first?.let { railProfile(it.title) } ?: RailNetwork.Profile.NEUTRAL
+    val route = rememberLoader(stopKey, profile) {
+        val pts = knownStops.orEmpty().map { it.codiceStazione to LatLon(it.lat, it.lon) }
+        if (pts.size < 2) emptyList() else withContext(Dispatchers.Default) { Graph.rail().route(pts, profile) }
     }
     val map = rememberMapView()
     val ctx = LocalContext.current
@@ -462,11 +489,8 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
                             }
                             if (!a.cancelled && a.nonPartito != true) DelayBadge(a.ritardo)
                         }
-                        when {
-                            route.loading -> Text("Calcolo del percorso sui binari OSM…", style = MaterialTheme.typography.labelSmall)
-                            route.error != null -> Text("Percorso OSM non disponibile: linee rette", style = MaterialTheme.typography.labelSmall)
-                            segments != null && segments.any { it == null } ->
-                                Text("Alcuni tratti in linea retta (binari non trovati)", style = MaterialTheme.typography.labelSmall)
+                        if (segments != null && segments.any { it == null }) {
+                            Text("Alcuni tratti in linea retta (binari non trovati)", style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }

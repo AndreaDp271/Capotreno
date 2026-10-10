@@ -6,9 +6,10 @@ Client Android libero e **non ufficiale** dei dati in tempo reale di
 - **Andamento treno**: fermate, orari programmati/effettivi/previsti, ritardo, ultimo rilevamento, binari programmati ed effettivi
 - **Tabellone di stazione**: partenze e arrivi, anche da un orario a scelta
 - **Mappa** OpenStreetMap (osmdroid): stazioni e linee con i treni in transito (tocca una linea per l'elenco)
-- **Percorso del treno sui binari OSM** (calcolato con [BRouter](https://brouter.de), profilo `rail`, con cache)
+- **Linee e percorsi sui binari reali**: la rete ferroviaria OSM è inclusa nell'app (offline), i percorsi sono calcolati sul telefono
 - **Ultimo rilevamento** anche in punti che non sono fermate (posti di comunicazione, bivi) e storico dei rilevamenti
-- **Biglietti**: importazione dei PDF (anche da "Condividi"), riconoscimento di treno/data/carrozza/posto, visualizzazione per il controllore
+- **Biglietti**: importazione di PDF e immagini (anche da "Condividi") o scansione con la fotocamera; il QR/Aztec viene estratto
+  e mostrato nitido al controllore, treno/data/carrozza/posto riconosciuti dai PDF (ZXing, PdfBox, CameraX: tutto offline)
 - **Infomobilità**: avvisi di circolazione, notizie in evidenza, treni in circolazione
 - **Preferiti** salvati solo sul dispositivo
 - Nessuna dipendenza proprietaria: niente Google Play Services, niente tracciamento
@@ -32,6 +33,21 @@ storePassword=...
 keyAlias=...
 keyPassword=...
 ```
+
+## Rete ferroviaria OSM
+
+`app/src/main/assets/rail_graph.bin` è generato da OpenStreetMap con `tools/build_rail_graph.py`
+(binari `railway=rail|narrow_gauge`, esclusi quelli industriali/militari; scali e tronchini inclusi ma penalizzati;
+piccole interruzioni della mappatura ricucite; stazioni ViaggiaTreno agganciate al binario di linea più vicino).
+I percorsi sono calcolati sul telefono con A* sul grafo orientato, senza inversioni di marcia negli scambi. Per rigenerarlo:
+
+```sh
+pip install osmium
+curl -LO https://download.geofabrik.de/europe/italy-latest.osm.pbf
+python tools/build_rail_graph.py italy-latest.osm.pbf app/src/main/assets/rail_graph.bin
+```
+
+Dati © OpenStreetMap contributors, disponibili con licenza [ODbL](https://www.openstreetmap.org/copyright).
 
 ## Fonte dei dati
 
@@ -66,7 +82,12 @@ L'API può cambiare senza preavviso. Su F-Droid l'app porta l'anti-feature **Non
 
 Descrizioni e changelog per lo store sono in `fastlane/metadata/android/`.
 
+## Permessi
+
+- `INTERNET`: dati ViaggiaTreno e mappe OSM
+- `CAMERA` (facoltativo, chiesto solo all'uso): scansione del codice del biglietto
+
 ## Licenza
 
-GPL-3.0-or-later. Mappe © contributori OpenStreetMap.
+GPL-3.0-or-later per il codice. Mappe e `rail_graph.bin` © contributori OpenStreetMap (ODbL).
 Non affiliata a Trenitalia, RFI o Gruppo FS.

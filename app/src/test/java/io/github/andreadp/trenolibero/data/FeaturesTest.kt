@@ -33,6 +33,45 @@ class FeaturesTest {
         assertNotNull(t.copy(id = "x").dateMs)
     }
 
+    /** Struttura del testo di un vero PDF Trenitalia (dati personali sostituiti). */
+    @Test
+    fun bigliettoTrenitaliaReale() {
+        val text = """
+            CIV Carrier 1183 -  Partita Iva: 05403151003
+            Biglietto Singolo -  Issuer 1183
+            Data Emissione 01/10/2026 ore 12:05
+            Canale: WEB
+            Numero Titolo: 1234567890
+            VIAGGIO da Roma Termini a Padova il 07/10/2026 alle ore 17:30 PNR: AB1CDE
+            CONDIZIONI DI TRASPORTO
+            Stazione di Partenza
+            Roma Termini
+            Ore 17:30 - 07/10/2026
+            Stazione di Arrivo
+            Padova
+            Ore 21:04 - 07/10/2026
+            Treno:  Frecciarossa 9430
+            Servizio: 2° Standard
+            Carrozza:  5
+            Posti: 6B
+            DETTAGLIO PASSEGGERI
+            Nome Passeggero (Adulto)
+            Mario Rossi
+            Dati di contatto comunicati
+        """.trimIndent()
+        val t = TicketParser.parse(text, stations + "PADOVA")
+        assertEquals("07/10/2026", t.date)
+        assertEquals("17:30", t.departure)
+        assertEquals("21:04", t.arrival)
+        assertEquals(listOf(TicketTrain("9430", "FR")), t.trains)
+        assertEquals("Roma Termini", t.from)
+        assertEquals("Padova", t.to)
+        assertEquals("5", t.coach)
+        assertEquals("6B", t.seat)
+        assertEquals("AB1CDE", t.pnr)
+        assertEquals("Mario Rossi", t.passenger)
+    }
+
     @Test
     fun bigliettoConCambio() {
         val t = TicketParser.parse("10.11.2026 REG 2938 Milano Centrale 08:05 IC 612 Roma Tiburtina 13:40", stations)
@@ -51,14 +90,4 @@ class FeaturesTest {
         assertEquals("FORLI", DetectionLocator.normalize("FORLI'"))
     }
 
-    @Test
-    fun taglioPercorso() {
-        val track = (0..100).map { LatLon(45.0, 9.0 + it * 0.01) }
-        val stops = listOf(LatLon(45.0, 9.0), LatLon(45.001, 9.5), LatLon(45.0, 10.0))
-        val legs = RailRouter.splitAtStops(track, stops)
-        assertEquals(2, legs.size)
-        assertEquals(51, legs[0]!!.size)
-        assertEquals(51, legs[1]!!.size)
-        assertTrue(legs[0]!!.last() == legs[1]!!.first())
-    }
 }

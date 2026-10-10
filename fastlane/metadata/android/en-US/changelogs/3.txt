@@ -1,0 +1,3 @@
+Lines and routes on real tracks: OpenStreetMap rail network bundled in the app (offline), no reversals at switches.
+Tickets: QR/Aztec code extracted from the PDF for inspectors, import from images, camera scanning; better Trenitalia PDF recognition.
+Map: only main stations when zoomed out.

@@ -61,15 +61,4 @@ class LiveApiTest {
         assertTrue(ViaggiaTrenoApi.lines(1).size > 50)
     }
 
-    @Test
-    fun percorsoBinariOsm() = runBlocking<Unit> {
-        val pts = listOf(LatLon(45.486347, 9.204528), LatLon(45.060969, 7.67747))
-        val track = java.net.URL(
-            "https://brouter.de/brouter?lonlats=9.204528,45.486347|7.67747,45.060969&profile=rail&format=geojson"
-        ).readText()
-        val n = ViaggiaTrenoApi.json.parseToJsonElement(track).toString().length
-        println("BRouter Milano-Torino: $n caratteri")
-        assertTrue(n > 1000)
-        assertEquals(1, RailRouter.splitAtStops(listOf(pts[0], pts[1]), pts).size)
-    }
 }

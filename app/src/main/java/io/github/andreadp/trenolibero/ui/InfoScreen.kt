@@ -85,7 +85,8 @@ fun InfoScreen(nav: Nav) {
                     items(d.news) { n -> NewsCard(n) }
                     item {
                         Text(
-                            "Dati: ViaggiaTreno (RFI/Trenitalia). App non ufficiale.",
+                            "Dati: ViaggiaTreno (RFI/Trenitalia). App non ufficiale.\n" +
+                                "Mappe e rete ferroviaria © OpenStreetMap contributors, licenza ODbL.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(16.dp),

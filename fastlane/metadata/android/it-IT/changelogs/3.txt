@@ -1,0 +1,3 @@
+Linee e percorsi sui binari reali: rete ferroviaria OpenStreetMap inclusa nell'app (offline), senza inversioni negli scambi.
+Biglietti: QR/Aztec estratto dal PDF e mostrato al controllore, importazione da immagini, scansione con la fotocamera; riconoscimento migliorato dei PDF Trenitalia.
+Mappa: da lontano solo le stazioni principali.

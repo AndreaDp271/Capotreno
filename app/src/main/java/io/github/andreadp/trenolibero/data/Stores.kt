@@ -101,15 +101,24 @@ class Favorites(context: Context) {
 object Graph {
     lateinit var stations: StationIndex
     lateinit var favorites: Favorites
-    lateinit var router: RailRouter
     lateinit var tickets: TicketStore
+    private lateinit var app: Context
 
     fun init(context: Context) {
         if (::stations.isInitialized) return
-        val app = context.applicationContext
+        app = context.applicationContext
         stations = StationIndex(app)
         favorites = Favorites(app)
-        router = RailRouter(app)
         tickets = TicketStore(app)
+    }
+
+    private val railMutex = Mutex()
+    private var railNetwork: RailNetwork? = null
+
+    /** Rete ferroviaria OSM inclusa negli asset, caricata alla prima richiesta. */
+    suspend fun rail(): RailNetwork = railMutex.withLock {
+        railNetwork ?: withContext(Dispatchers.IO) {
+            app.assets.open("rail_graph.bin").use { RailNetwork.load(it) }
+        }.also { railNetwork = it }
     }
 }
