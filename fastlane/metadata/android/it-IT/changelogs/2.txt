@@ -1,0 +1,3 @@
+Mappa: linee con treni in transito (tocca una linea per vedere i treni), colori più leggibili.
+Percorso del treno sui binari reali di OpenStreetMap, ultimo rilevamento e storico dei rilevamenti anche fuori dalle stazioni.
+Nuovo: importazione dei biglietti PDF con riconoscimento di treno, data, carrozza e posto.

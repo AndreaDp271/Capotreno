@@ -101,10 +101,15 @@ class Favorites(context: Context) {
 object Graph {
     lateinit var stations: StationIndex
     lateinit var favorites: Favorites
+    lateinit var router: RailRouter
+    lateinit var tickets: TicketStore
 
     fun init(context: Context) {
         if (::stations.isInitialized) return
-        stations = StationIndex(context.applicationContext)
-        favorites = Favorites(context.applicationContext)
+        val app = context.applicationContext
+        stations = StationIndex(app)
+        favorites = Favorites(app)
+        router = RailRouter(app)
+        tickets = TicketStore(app)
     }
 }

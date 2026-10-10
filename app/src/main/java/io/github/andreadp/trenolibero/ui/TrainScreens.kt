@@ -58,6 +58,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.andreadp.trenolibero.data.Andamento
+import io.github.andreadp.trenolibero.data.DetectionHistory
+import io.github.andreadp.trenolibero.data.DetectionLocator
 import io.github.andreadp.trenolibero.data.ApiException
 import io.github.andreadp.trenolibero.data.Favorites
 import io.github.andreadp.trenolibero.data.Fermata
@@ -178,18 +180,27 @@ suspend fun resolveTrain(number: String, originId: String?, dateMs: Long?): Pair
         TrainMatch("", number, originId, dateMs)
     } else {
         val found = ViaggiaTrenoApi.searchTrain(number)
-        found.firstOrNull { it.originId == originId } ?: found.firstOrNull()
+        val m = found.firstOrNull { it.originId == originId } ?: found.firstOrNull()
             ?: throw ApiException("Treno $number non trovato per oggi")
+        // Da un biglietto si conosce la data ma non la stazione d'origine
+        if (dateMs != null) m.copy(dateMs = dateMs) else m
     }
     val status = ViaggiaTrenoApi.trainStatus(match.originId, match.number, match.dateMs)
-        ?: throw ApiException("Dati non disponibili per il treno $number")
+        ?: throw ApiException(
+            if (match.dateMs > System.currentTimeMillis()) "I dati in tempo reale saranno disponibili il giorno del viaggio"
+            else "Dati non disponibili per il treno $number"
+        )
     return match to status
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
-    val state = rememberLoader(number, originId, dateMs, refreshMs = 60_000) { resolveTrain(number, originId, dateMs) }
+    val state = rememberLoader(number, originId, dateMs, refreshMs = 60_000) {
+        resolveTrain(number, originId, dateMs).also { (m, a) ->
+            DetectionHistory.record(DetectionHistory.key(m.originId, m.number, m.dateMs), a)
+        }
+    }
     val favTrains by Graph.favorites.trains.collectAsState()
     val loaded = state.data
 
@@ -241,16 +252,20 @@ private fun TrainDetail(nav: Nav, a: Andamento) {
     LazyColumn(Modifier.fillMaxSize()) {
         item { TrainHeader(a) }
         item { SectionTitle("Fermate") }
+        // Rilevamento in un punto che non è una fermata (stazione di transito, posto di comunicazione, bivio…)
+        val det = a.stazioneUltimoRilevamento?.takeIf { it.isNotBlank() && it != "--" && a.arrivato != true }
+        val detIsStop = det != null && a.fermate.any { DetectionLocator.normalize(it.stazione) == DetectionLocator.normalize(det) }
         itemsIndexed(a.fermate) { i, f ->
             StopRow(
                 f = f,
                 first = i == 0,
                 last = i == a.fermate.lastIndex,
-                current = i == lastReached && a.arrivato != true,
+                current = i == lastReached && a.arrivato != true && (det == null || detIsStop),
                 trainDelay = a.ritardo,
                 trainStarted = a.nonPartito != true,
                 onClick = { nav.station(f.id, f.stazione) },
             )
+            if (det != null && !detIsStop && i == lastReached) DetectionRow(det, a.oraUltimoRilevamento)
         }
         item { Spacer(Modifier.height(24.dp)) }
     }
@@ -381,6 +396,28 @@ private fun StopRow(
         }
     }
     HorizontalDivider(Modifier.padding(start = 48.dp), color = lineColor.copy(alpha = 0.4f))
+}
+
+/** Riga tra due fermate: il treno è stato rilevato in un punto intermedio. */
+@Composable
+private fun DetectionRow(name: String, time: Long?) {
+    Row(
+        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(end = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(48.dp).height(44.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.width(3.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
+            Box(Modifier.size(12.dp).background(Color(0xFFE65100), CircleShape))
+        }
+        Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+            Text("Rilevato a $name", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(
+                "alle ${fmtTime(time)} · in transito, non è una fermata",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+    }
 }
 
 @Composable

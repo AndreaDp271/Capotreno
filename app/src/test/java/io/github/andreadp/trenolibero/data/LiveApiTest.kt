@@ -1,6 +1,7 @@
 package io.github.andreadp.trenolibero.data
 
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -46,5 +47,29 @@ class LiveApiTest {
         val total = (1..22).sumOf { ViaggiaTrenoApi.stationsOfRegion(it).count { s -> s.hasCoords } }
         println("Stazioni con coordinate: $total")
         assertTrue(total > 1500)
+    }
+
+    @Test
+    fun lineeETreniInTransito() = runBlocking<Unit> {
+        val nazionali = ViaggiaTrenoApi.lines(0)
+        println("Linee nazionali: ${nazionali.size}, occupate ${nazionali.count { it.occupata }}")
+        assertTrue(nazionali.size > 50)
+        val busy = nazionali.first { it.occupata && it.nodoA != "S00000" }
+        val dirs = ViaggiaTrenoApi.lineTrains(0, busy.trattaAB, busy.trattaBA)
+        println(dirs.joinToString { "${it.tratta}: ${it.treni.size}" })
+        assertTrue(dirs.sumOf { it.treni.size } > 0)
+        assertTrue(ViaggiaTrenoApi.lines(1).size > 50)
+    }
+
+    @Test
+    fun percorsoBinariOsm() = runBlocking<Unit> {
+        val pts = listOf(LatLon(45.486347, 9.204528), LatLon(45.060969, 7.67747))
+        val track = java.net.URL(
+            "https://brouter.de/brouter?lonlats=9.204528,45.486347|7.67747,45.060969&profile=rail&format=geojson"
+        ).readText()
+        val n = ViaggiaTrenoApi.json.parseToJsonElement(track).toString().length
+        println("BRouter Milano-Torino: $n caratteri")
+        assertTrue(n > 1000)
+        assertEquals(1, RailRouter.splitAtStops(listOf(pts[0], pts[1]), pts).size)
     }
 }

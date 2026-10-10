@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
@@ -16,6 +17,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.padding
@@ -48,6 +54,10 @@ class Nav(private val c: NavHostController) {
         c.navigate("station/${Uri.encode(id)}?name=${Uri.encode(name)}")
 
     fun map(focusId: String) = c.navigate("map?focus=${Uri.encode(focusId)}")
+
+    fun line(region: Int, ab: Int, ba: Int) = c.navigate("line/$region/$ab/$ba")
+
+    fun ticket(id: String) = c.navigate("ticket/${Uri.encode(id)}")
 }
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
@@ -56,13 +66,31 @@ private val tabs = listOf(
     Tab("home", "Treni", Icons.Default.Home),
     Tab("stations", "Stazioni", Icons.Default.Search),
     Tab("map", "Mappa", Icons.Default.Place),
+    Tab("tickets", "Biglietti", Icons.Default.Email),
     Tab("info", "Info", Icons.Default.Info),
 )
 
+/**
+ * [pendingImport]: PDF ricevuto da un'altra app (condividi/apri con), da importare come biglietto.
+ */
 @Composable
-fun App() {
+fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}) {
     val controller = rememberNavController()
     val nav = remember(controller) { Nav(controller) }
+    var importError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(pendingImport) {
+        val uri = pendingImport ?: return@LaunchedEffect
+        importTicket(uri).onSuccess { nav.ticket(it.id) }.onFailure { importError = errorMessage(it) }
+        onImportHandled()
+    }
+    importError?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { importError = null },
+            title = { Text("Importazione non riuscita") },
+            text = { Text(msg) },
+            confirmButton = { TextButton(onClick = { importError = null }) { Text("OK") } },
+        )
+    }
     val entry by controller.currentBackStackEntryAsState()
     val route = entry?.destination?.route
     val onTab = tabs.any { it.route == route }
@@ -93,6 +121,12 @@ fun App() {
             composable("stations") { StationSearchScreen(nav) }
             composable("map") { StationsMapScreen(nav, null) }
             composable("info") { InfoScreen(nav) }
+            composable("tickets") { TicketsScreen(nav) }
+            composable("ticket/{id}") { TicketScreen(nav, it.arguments!!.getString("id")!!) }
+            composable("line/{region}/{ab}/{ba}") {
+                val a = it.arguments!!
+                LineScreen(nav, a.getString("region")!!.toInt(), a.getString("ab")!!.toInt(), a.getString("ba")!!.toInt())
+            }
             composable(
                 "map?focus={focus}",
                 arguments = listOf(navArgument("focus") { type = NavType.StringType; nullable = true }),

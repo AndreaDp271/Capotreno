@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Segnaposto arancione con treno: posizione dell'ultimo rilevamento -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="40dp"
+    android:height="48dp"
+    android:viewportWidth="40"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#FFE65100"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M20,2C10.6,2 3,9.6 3,19c0,12.5 17,27 17,27s17,-14.5 17,-27C37,9.6 29.4,2 20,2z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M15,9h10a4,4 0,0 1,4 4v10a4,4 0,0 1,-4 4h-10a4,4 0,0 1,-4 -4v-10a4,4 0,0 1,4 -4z" />
+    <path
+        android:fillColor="#FFE65100"
+        android:pathData="M14,12h12v6H14zM15,22.5a1.5,1.5 0,1 0,3 0a1.5,1.5 0,1 0,-3 0zM22,22.5a1.5,1.5 0,1 0,3 0a1.5,1.5 0,1 0,-3 0z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M15,27l-3,4h2.5l3,-4zM25,27l3,4h-2.5l-3,-4z" />
+</vector>

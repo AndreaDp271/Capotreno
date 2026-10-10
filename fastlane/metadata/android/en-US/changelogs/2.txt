@@ -1,0 +1,3 @@
+Map: lines with trains running (tap a line to list them), clearer colours.
+Train route on real OpenStreetMap tracks, last detection and detection history even outside stations.
+New: PDF ticket import with train, date, coach and seat recognition.

@@ -126,3 +126,38 @@ data class Statistiche(
 
 /** Avviso di infomobilità estratto dall'HTML del servizio. */
 data class InfoNews(val title: String, val date: String, val html: String, val highlighted: Boolean)
+
+/** Linea (tratta) della mappa: segmento tra due nodi, "occupata" se ci sono treni in transito. */
+@Serializable
+data class Tratta(
+    val nodoA: String? = null,
+    val nodoB: String? = null,
+    val trattaAB: Int = 0,
+    val trattaBA: Int = 0,
+    val latitudineA: Double = 0.0,
+    val longitudineA: Double = 0.0,
+    val latitudineB: Double = 0.0,
+    val longitudineB: Double = 0.0,
+    val occupata: Boolean = false,
+)
+
+/** Treno in transito su una tratta (dettagliTratta: qui gli orari sono stringhe già formattate). */
+@Serializable
+data class TrenoTratta(
+    val numeroTreno: Int = 0,
+    val codOrigine: String? = null,
+    val dataPartenzaTreno: Long? = null,
+    val compNumeroTreno: String? = null,
+    val origine: String? = null,
+    val destinazione: String? = null,
+    val compOrarioPartenza: String? = null,
+    val compOrarioArrivo: String? = null,
+    val ritardo: Int? = null,
+    val nonPartito: Boolean? = null,
+    val provvedimento: Int? = null,
+) {
+    val title: String get() = compNumeroTreno?.trim()?.takeIf { it.isNotEmpty() } ?: "$numeroTreno"
+}
+
+@Serializable
+data class DirezioneTratta(val tratta: String = "", val treni: List<TrenoTratta> = emptyList())

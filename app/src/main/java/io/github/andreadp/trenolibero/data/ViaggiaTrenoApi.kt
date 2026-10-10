@@ -125,6 +125,24 @@ object ViaggiaTrenoApi {
         return json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(StationGeo.serializer()), b)
     }
 
+    // ---- Linee (tratte) ----
+
+    private const val CATEGORIE = "ES*,IC,EXP,EC,EN,REG,MET"
+
+    /** Regione 0 = rete nazionale principale, 1..22 = tratte regionali di dettaglio. */
+    suspend fun lines(region: Int): List<Tratta> {
+        val b = get("elencoTratte/$region/8/${seg(CATEGORIE)}/null/${System.currentTimeMillis()}").trim()
+        if (b.isEmpty()) return emptyList()
+        return json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(Tratta.serializer()), b)
+            .filter { it.latitudineA != 0.0 && it.latitudineB != 0.0 }
+    }
+
+    suspend fun lineTrains(region: Int, ab: Int, ba: Int): List<DirezioneTratta> {
+        val b = get("dettagliTratta/$region/$ab/$ba/${seg(CATEGORIE)}/null").trim()
+        if (b.isEmpty()) return emptyList()
+        return json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(DirezioneTratta.serializer()), b)
+    }
+
     // ---- Infomobilità ----
 
     suspend fun statistics(): Statistiche =

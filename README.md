@@ -5,7 +5,10 @@ Client Android libero e **non ufficiale** dei dati in tempo reale di
 
 - **Andamento treno**: fermate, orari programmati/effettivi/previsti, ritardo, ultimo rilevamento, binari programmati ed effettivi
 - **Tabellone di stazione**: partenze e arrivi, anche da un orario a scelta
-- **Mappa** OpenStreetMap (osmdroid): tutte le stazioni e il percorso del treno
+- **Mappa** OpenStreetMap (osmdroid): stazioni e linee con i treni in transito (tocca una linea per l'elenco)
+- **Percorso del treno sui binari OSM** (calcolato con [BRouter](https://brouter.de), profilo `rail`, con cache)
+- **Ultimo rilevamento** anche in punti che non sono fermate (posti di comunicazione, bivi) e storico dei rilevamenti
+- **Biglietti**: importazione dei PDF (anche da "Condividi"), riconoscimento di treno/data/carrozza/posto, visualizzazione per il controllore
 - **Infomobilità**: avvisi di circolazione, notizie in evidenza, treni in circolazione
 - **Preferiti** salvati solo sul dispositivo
 - Nessuna dipendenza proprietaria: niente Google Play Services, niente tracciamento
@@ -42,6 +45,8 @@ L'app usa l'API REST pubblica ma non documentata del sito ViaggiaTreno:
 | `autocompletaStazione/{testo}` | ricerca stazione |
 | `partenze/{stazione}/{data}`, `arrivi/…` | tabellone |
 | `elencoStazioni/{regione}`, `regione/{stazione}`, `dettaglioStazione/…` | coordinate per la mappa |
+| `elencoTratte/{regione}/{zoom}/{categorie}/null/{ts}` | linee e stato "occupata" |
+| `dettagliTratta/{regione}/{AB}/{BA}/{categorie}/null` | treni in transito su una linea |
 | `statistiche/{ts}`, `infomobilitaTicker/`, `infomobilitaRSS/false` | infomobilità |
 
 Note: il server risponde solo in HTTP (l'HTTPS fa redirect), quindi il traffico in chiaro
