@@ -3,6 +3,7 @@ package io.github.andreadp.trenolibero.ui
 import android.app.TimePickerDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -228,7 +229,7 @@ private fun BoardRow(e: BoardEntry, departures: Boolean, onClick: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(e.title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(Modifier.padding(vertical = 2.dp)) { TrainBadge(e.title, e.categoriaDescrizione?.trim()?.ifEmpty { null } ?: e.title.substringBefore(' ')) }
             val status = when {
                 cancelled -> "Soppresso"
                 e.nonPartito == true -> "Non partito"

@@ -1,0 +1,1 @@
+Tabellone di stazione e linee: badge del treno colorati per categoria (Frecce, Intercity, regionali).

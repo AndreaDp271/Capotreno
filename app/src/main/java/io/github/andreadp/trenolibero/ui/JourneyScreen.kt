@@ -290,7 +290,7 @@ fun StationField(label: String, value: StationRef?, onSelect: (StationRef?) -> U
 }
 
 /** Colore del badge per categoria, ispirato ai colori dei treni. */
-private fun categoryColor(category: String): Color = when (category.uppercase()) {
+fun categoryColor(category: String): Color = when (category.uppercase()) {
     "FR" -> Color(0xFFC8102E)
     "FA" -> Color(0xFF6E7B85)
     "FB" -> Color(0xFF0E7FB8)
@@ -300,10 +300,14 @@ private fun categoryColor(category: String): Color = when (category.uppercase())
 }
 
 @Composable
-private fun CategoryBadge(leg: JourneyLeg) {
-    Surface(color = categoryColor(leg.category), shape = RoundedCornerShape(6.dp)) {
+private fun CategoryBadge(leg: JourneyLeg) = TrainBadge(leg.title, leg.category)
+
+/** Badge del treno colorato per categoria (es. "FR 9600" rosso, "REG 2938" verde). */
+@Composable
+fun TrainBadge(title: String, category: String = title.trim().substringBefore(' ')) {
+    Surface(color = categoryColor(category), shape = RoundedCornerShape(6.dp)) {
         Text(
-            leg.title,
+            title.trim(),
             color = Color.White,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,

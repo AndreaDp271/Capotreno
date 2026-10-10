@@ -75,7 +75,7 @@ private fun LineTrainRow(t: TrenoTratta, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.width(96.dp)) {
-            Text(t.title, fontWeight = FontWeight.Bold)
+            TrainBadge(t.title)
             if (t.provvedimento != 1 && t.nonPartito != true) DelayBadge(t.ritardo)
         }
         Column(Modifier.weight(1f)) {

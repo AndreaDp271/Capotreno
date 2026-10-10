@@ -1,0 +1,1 @@
+Station board and lines: train badges coloured by category (Frecce, Intercity, regional).
