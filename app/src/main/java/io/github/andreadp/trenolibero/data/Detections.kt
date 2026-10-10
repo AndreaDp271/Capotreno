@@ -40,6 +40,26 @@ object DetectionHistory {
     }
 }
 
+/** Punto più vicino a [p] su una polilinea: indice del segmento e punto proiettato. */
+fun projectOnPolyline(points: List<LatLon>, p: LatLon): Pair<Int, LatLon>? {
+    if (points.size < 2) return null
+    val k = kotlin.math.cos(Math.toRadians(p.lat))
+    var best = Double.MAX_VALUE
+    var bestI = 0
+    var bestP = points.first()
+    for (i in 0 until points.size - 1) {
+        val a = points[i]; val b = points[i + 1]
+        val ax = a.lon * k; val ay = a.lat
+        val dx = b.lon * k - ax; val dy = b.lat - ay
+        val len2 = dx * dx + dy * dy
+        val t = if (len2 == 0.0) 0.0 else (((p.lon * k - ax) * dx + (p.lat - ay) * dy) / len2).coerceIn(0.0, 1.0)
+        val qx = ax + t * dx; val qy = ay + t * dy
+        val d = (qx - p.lon * k) * (qx - p.lon * k) + (qy - p.lat) * (qy - p.lat)
+        if (d < best) { best = d; bestI = i; bestP = LatLon(qy, qx / k) }
+    }
+    return bestI to bestP
+}
+
 object DetectionLocator {
     private val prefix = Regex(
         "^(\\d+\\s*)?(BV PC|BV|PC|PM|PP|PJ|SSE|POSTO DI COMUNICAZIONE|POSTO COMUNICAZIONE|POSTO DI MOVIMENTO|POSTO MOVIMENTO|" +

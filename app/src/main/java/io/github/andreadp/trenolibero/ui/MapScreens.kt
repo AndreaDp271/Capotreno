@@ -50,6 +50,7 @@ import io.github.andreadp.trenolibero.data.DetectionLocator
 import io.github.andreadp.trenolibero.data.Graph
 import io.github.andreadp.trenolibero.data.LatLon
 import io.github.andreadp.trenolibero.data.Precision
+import io.github.andreadp.trenolibero.data.projectOnPolyline
 import io.github.andreadp.trenolibero.data.RailNetwork
 import io.github.andreadp.trenolibero.data.StationGeo
 import io.github.andreadp.trenolibero.data.Tratta
@@ -258,7 +259,9 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
         }
         val markers = trains.map { tr ->
             Marker(map).apply {
-                position = GeoPoint(tr.detection.lat, tr.detection.lon)
+                // il tratto parte dal punto proiettato sui binari
+                val at = tr.segment.firstOrNull() ?: LatLon(tr.detection.lat, tr.detection.lon)
+                position = GeoPoint(at.lat, at.lon)
                 icon = TrainMarker.icon(ctx, TrainMarker.bearingAlong(tr.segment))
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 infoWindow = null
@@ -541,11 +544,16 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
                         a.arrivato == true || i < lastReachedKnown -> line(leg, 0)
                         running && i == lastReachedKnown -> {
                             // tratto in corso: diviso nel punto dell'ultimo rilevamento, se cade al suo interno
-                            val cut = lastDet?.takeIf { d -> DetectionLocator.normalize(d.detection.name) != DetectionLocator.normalize(known[lastReachedKnown].first.stazione) }?.let { d ->
-                                leg.indices.minBy { DetectionLocator.distanceKm(leg[it].latitude, leg[it].longitude, d.lat, d.lon) }
-                            } ?: 0
-                            line(leg.subList(0, cut + 1), 0)
-                            line(leg.subList(cut, leg.size), 1)
+                            val proj = lastDet?.takeIf { d -> DetectionLocator.normalize(d.detection.name) != DetectionLocator.normalize(known[lastReachedKnown].first.stazione) }?.let { d ->
+                                projectOnPolyline(leg.map { LatLon(it.latitude, it.longitude) }, LatLon(d.lat, d.lon))
+                            }
+                            if (proj == null) {
+                                line(leg, 1)
+                            } else {
+                                val q = GeoPoint(proj.second.lat, proj.second.lon)
+                                line(leg.subList(0, proj.first + 1) + q, 0)
+                                line(listOf(q) + leg.subList(proj.first + 1, leg.size), 1)
+                            }
                         }
                         else -> line(leg, 2)
                     }
@@ -570,10 +578,11 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
                 // Rilevamenti: i precedenti come scia, l'ultimo con l'icona del treno
                 val allRoute = legs.flatten()
                 detections.forEachIndexed { i, ld ->
+                    // sempre sul percorso: le coordinate di stazioni e posti tecnici non cadono sui binari
                     var p = GeoPoint(ld.lat, ld.lon)
-                    if (ld.precision == Precision.ESTIMATED && allRoute.isNotEmpty()) {
-                        p = allRoute.minBy { DetectionLocator.distanceKm(it.latitude, it.longitude, ld.lat, ld.lon) }
-                    }
+                    projectOnPolyline(allRoute.map { LatLon(it.latitude, it.longitude) }, LatLon(ld.lat, ld.lon))
+                        ?.second?.takeIf { DetectionLocator.distanceKm(it.lat, it.lon, ld.lat, ld.lon) < 15 }
+                        ?.let { p = GeoPoint(it.lat, it.lon) }
                     val last = i == detections.lastIndex
                     map.overlays.add(Marker(map).apply {
                         position = p

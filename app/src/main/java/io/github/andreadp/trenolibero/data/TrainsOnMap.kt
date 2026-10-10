@@ -65,8 +65,22 @@ object TrainsOnMap {
             "FR", "FA", "ITA", "AV", "ES", "ES*" -> RailNetwork.Profile.HIGH_SPEED
             else -> RailNetwork.Profile.REGIONAL
         }
-        val fromCode = if (det.precision == Precision.EXACT) all.firstOrNull { DetectionLocator.normalize(it.name) == DetectionLocator.normalize(name) }?.codiceStazione else null
-        val seg = rail?.path(fromCode, from, next.id, to, profile) ?: listOf(from, to)
+        // Tratta sui binari dalla fermata precedente alla prossima: il pallino va proiettato lì sopra,
+        // perché le coordinate di stazioni e posti tecnici non cadono esattamente sui binari
+        val prev = a.fermate.take(lastReached + 1).lastOrNull { !it.suppressed && index[it.id] != null }
+        val leg = prev?.let { pf ->
+            val pg = index[pf.id]!!
+            rail?.path(pf.id, LatLon(pg.lat, pg.lon), next.id, to, profile)
+        }
+        val projected = leg?.let { projectOnPolyline(it, from) }?.takeIf { (_, q) ->
+            DetectionLocator.distanceKm(q.lat, q.lon, from.lat, from.lon) < 15
+        }
+        val seg = if (leg != null && projected != null) {
+            listOf(projected.second) + leg.drop(projected.first + 1)
+        } else {
+            val fromCode = if (det.precision == Precision.EXACT) all.firstOrNull { DetectionLocator.normalize(it.name) == DetectionLocator.normalize(name) }?.codiceStazione else null
+            rail?.path(fromCode, from, next.id, to, profile) ?: listOf(from, to)
+        }
         return TrainOnMap(
             title = a.title,
             number = tr.numeroTreno.toString(),

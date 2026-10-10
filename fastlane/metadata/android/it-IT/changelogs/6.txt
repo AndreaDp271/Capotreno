@@ -1,0 +1,1 @@
+I treni sulla mappa sono posizionati sui binari (prima alcuni cadevano fuori dalla linea).
