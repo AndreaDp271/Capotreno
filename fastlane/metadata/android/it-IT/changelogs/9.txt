@@ -1,0 +1,1 @@
+Cerca viaggio: nuova grafica delle soluzioni, pulsanti Visualizza treno e Acquista (sito del venditore), la lista resta tornando indietro.

@@ -3,6 +3,23 @@ package io.github.andreadp.trenolibero.ui
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
+import io.github.andreadp.trenolibero.data.JourneyLeg
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -61,6 +78,12 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+/** Ultima ricerca, conservata finché l'app resta aperta. */
+private object JourneyCache {
+    var results: List<Journey>? = null
+    var error: String? = null
+}
+
 /** Ricerca viaggio da stazione a stazione, con filtri per tipo di treno e compagnia. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,14 +91,16 @@ fun JourneyScreen(nav: Nav) {
     var from by rememberSaveable { mutableStateOf<String?>(null) } // "id|nome"
     var to by rememberSaveable { mutableStateOf<String?>(null) }
     var timeMs by rememberSaveable { mutableStateOf<Long?>(null) }
-    var results by remember { mutableStateOf<List<Journey>?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
+    // risultati conservati per la sessione: tornando indietro da un treno la lista resta
+    var results by remember { mutableStateOf(JourneyCache.results) }
+    var error by remember { mutableStateOf(JourneyCache.error) }
     var loading by remember { mutableStateOf(false) }
     var kinds by rememberSaveable { mutableStateOf(TrainKind.entries.map { it.name }.toSet()) }
     var directOnly by rememberSaveable { mutableStateOf(false) }
     var hiddenCompanies by rememberSaveable { mutableStateOf(emptySet<String>()) }
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
+    val listState = rememberLazyListState()
 
     fun ref(s: String?) = s?.split("|", limit = 2)?.let { StationRef(it[0], it[1]) }
 
@@ -90,6 +115,8 @@ fun JourneyScreen(nav: Nav) {
             } catch (e: Exception) {
                 error = errorMessage(e)
             }
+            JourneyCache.results = results
+            JourneyCache.error = error
             loading = false
         }
     }
@@ -117,7 +144,7 @@ fun JourneyScreen(nav: Nav) {
         val shown = all.filter { j ->
             j.kinds.all { it.name in kinds } && (!directOnly || j.changes == 0) && j.companies.none { it in hiddenCompanies }
         }
-        LazyColumn(Modifier.padding(pad).fillMaxSize()) {
+        LazyColumn(Modifier.padding(pad).fillMaxSize(), state = listState) {
             item {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     StationField("Da", ref(from)) { from = it?.let { s -> "${s.id}|${s.name}" } }
@@ -230,43 +257,162 @@ private fun StationField(label: String, value: StationRef?, onSelect: (StationRe
     }
 }
 
+/** Colore del badge per categoria, ispirato ai colori dei treni. */
+private fun categoryColor(category: String): Color = when (category.uppercase()) {
+    "FR" -> Color(0xFFC8102E)
+    "FA" -> Color(0xFF6E7B85)
+    "FB" -> Color(0xFF0E7FB8)
+    "IC", "ICN", "EC", "EN" -> Color(0xFF1F4E9C)
+    "BU" -> Color(0xFF616161)
+    else -> Color(0xFF2E7D32)
+}
+
+@Composable
+private fun CategoryBadge(leg: JourneyLeg) {
+    Surface(color = categoryColor(leg.category), shape = RoundedCornerShape(6.dp)) {
+        Text(
+            leg.title,
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+    }
+}
+
+/** Sito di vendita per compagnia (non è possibile precompilare la ricerca: si apre la pagina di acquisto). */
+private data class Seller(val name: String, val url: String)
+
+private fun sellerFor(company: String): Seller = when (company) {
+    "Trenord" -> Seller("Trenord", "https://www.trenord.it/")
+    "ÖBB" -> Seller("ÖBB", "https://shop.oebbtickets.at/")
+    else -> Seller("Trenitalia", "https://www.trenitalia.com/")
+}
+
+private fun dayOf(l: JourneyLeg) = l.dateMs ?: midnight(l.departure)
+
 @Composable
 private fun JourneyCard(nav: Nav, j: Journey) {
-    var open by remember { mutableStateOf(false) }
+    var open by rememberSaveable { mutableStateOf(false) }
+    val uri = LocalUriHandler.current
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp).animateContentSize()
-            .clickable {
-                if (j.legs.size == 1) j.legs.single().let { l -> nav.train(l.number, l.originId, l.dateMs ?: midnight(l.departure)) } else open = !open
-            },
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).animateContentSize().clickable { open = !open },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (open) 6.dp else 2.dp),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("${fmtTime(j.departure)} → ${fmtTime(j.arrival)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(duration(j.arrival - j.departure), style = MaterialTheme.typography.bodySmall)
-                if (j.delay != null) DelayBadge(j.delay)
+        Column(Modifier.padding(16.dp)) {
+            // Orari e linea del viaggio
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text(fmtTime(j.departure), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(j.legs.first().from, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 110.dp))
+                }
+                Column(Modifier.weight(1f).padding(horizontal = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(duration(j.arrival - j.departure), style = MaterialTheme.typography.labelMedium)
+                    TripLine(j.changes)
+                    Text(
+                        if (j.changes == 0) "diretto" else "${j.changes} ${if (j.changes == 1) "cambio" else "cambi"}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (j.changes == 0) Palette.onTime else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(fmtTime(j.arrival), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(j.legs.last().to, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 110.dp))
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            // Treni, compagnie, prezzo
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    j.legs.forEach { CategoryBadge(it) }
+                    if (j.delay != null) DelayBadge(j.delay)
+                    j.platform?.let { PlatformBadge(it, null) }
+                }
+                j.price?.let {
+                    Text(
+                        "%.2f €".format(it),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
             }
             Text(
-                j.legs.joinToString(" + ") { it.title } + " · " + if (j.changes == 0) "diretto" else "${j.changes} ${if (j.changes == 1) "cambio" else "cambi"}",
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+                j.companies.joinToString(" · "),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(j.companies.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                j.platform?.let { PlatformBadge(it, null) }
-                j.price?.let { Text("da %.2f €".format(it), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) }
-            }
+
             if (open) {
-                HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                j.legs.forEach { l ->
-                    Column(Modifier.fillMaxWidth().clickable { nav.train(l.number, l.originId, l.dateMs ?: midnight(l.departure)) }.padding(vertical = 4.dp)) {
-                        Text("${l.title} · ${l.company}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                        Text("${fmtTime(l.departure)} ${l.from} → ${fmtTime(l.arrival)} ${l.to}", style = MaterialTheme.typography.bodySmall)
+                HorizontalDivider(Modifier.padding(vertical = 10.dp))
+                j.legs.forEachIndexed { i, l ->
+                    if (i > 0) {
+                        val wait = (l.departure - j.legs[i - 1].arrival) / 60_000
+                        Text(
+                            "Cambio a ${l.from} · $wait min",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.padding(start = 26.dp, top = 2.dp, bottom = 2.dp),
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(12.dp).background(categoryColor(l.category), CircleShape))
+                        Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                CategoryBadge(l)
+                                Text(l.company, style = MaterialTheme.typography.labelSmall)
+                            }
+                            Text("${fmtTime(l.departure)}  ${l.from}", style = MaterialTheme.typography.bodyMedium)
+                            Text("${fmtTime(l.arrival)}  ${l.to}", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        if (j.legs.size > 1) {
+                            TextButton(onClick = { nav.train(l.number, l.originId, dayOf(l)) }) { Text("Visualizza") }
+                        }
                     }
                 }
-            } else if (j.legs.size > 1) {
-                Text("Tocca per i dettagli dei cambi", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(12.dp))
+                val sellers = j.legs.filter { it.category.uppercase() != "BU" }.map { sellerFor(it.company) }.distinct()
+                    .ifEmpty { listOf(sellerFor("Trenitalia")) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    if (j.legs.size == 1) {
+                        OutlinedButton(
+                            onClick = { j.legs.single().let { l -> nav.train(l.number, l.originId, dayOf(l)) } },
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Visualizza treno") }
+                    }
+                    sellers.forEach { s ->
+                        Button(onClick = { uri.openUri(s.url) }, modifier = Modifier.weight(1f)) {
+                            Text(if (sellers.size == 1) "Acquista" else "Acquista ${s.name}", maxLines = 1)
+                        }
+                    }
+                }
+                Text(
+                    "L'acquisto avviene sul sito di ${sellers.joinToString(" / ") { it.name }}.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
         }
+    }
+}
+
+/** Linea orizzontale con un pallino per ogni cambio. */
+@Composable
+private fun TripLine(changes: Int) {
+    val color = MaterialTheme.colorScheme.primary
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).background(color, CircleShape))
+        repeat(changes + 1) { i ->
+            Box(Modifier.weight(1f).height(2.dp).background(color))
+            if (i < changes) Box(Modifier.size(8.dp).border(2.dp, color, CircleShape))
+        }
+        Box(Modifier.size(8.dp).background(color, CircleShape))
     }
 }
