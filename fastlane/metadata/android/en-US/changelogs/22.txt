@@ -1,0 +1,1 @@
+Platforms get their own distinct color: dark sign with yellow number, solid yellow when the platform has changed.

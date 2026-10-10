@@ -1,0 +1,1 @@
+Binari con un colore proprio, ben distinto: cartello scuro con numero giallo, giallo pieno se il binario è cambiato.

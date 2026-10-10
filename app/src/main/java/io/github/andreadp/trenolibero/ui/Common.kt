@@ -61,6 +61,9 @@ object Palette {
     val late = Color(0xFFE65100)
     val veryLate = Color(0xFFC62828)
     val early = Color(0xFF1565C0)
+    val platformSign = Color(0xFF263238)
+    val platformText = Color(0xFFFFD54F)
+    val platformChanged = Color(0xFFFFC400)
 }
 
 // ---------- Caricamento dati ----------
@@ -183,13 +186,23 @@ fun PlatformBadge(programmed: String?, actual: String?, modifier: Modifier = Mod
     if (p.isEmpty() && a.isEmpty()) return
     val changed = a.isNotEmpty() && p.isNotEmpty() && a != p
     val confirmed = a.isNotEmpty()
+    // Colori fissi, indipendenti dal tema: cartello scuro con numero giallo come nei tabelloni di stazione;
+    // binario cambiato in giallo pieno per farlo notare subito
     val bg = when {
-        changed -> Palette.veryLate
-        confirmed -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.surfaceVariant
+        changed -> Palette.platformChanged
+        confirmed -> Palette.platformSign
+        else -> Palette.platformSign.copy(alpha = 0.55f)
     }
-    val fg = if (changed || confirmed) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-    Surface(color = bg, shape = RoundedCornerShape(6.dp), modifier = modifier) {
+    val fg = when {
+        changed -> Palette.platformSign
+        confirmed -> Palette.platformText
+        else -> Palette.platformText.copy(alpha = 0.75f)
+    }
+    Surface(
+        color = bg, shape = RoundedCornerShape(6.dp), modifier = modifier,
+        // bordo giallo tenue: il cartello resta visibile anche sul tema scuro
+        border = if (changed) null else androidx.compose.foundation.BorderStroke(1.dp, Palette.platformText.copy(alpha = 0.4f)),
+    ) {
         Text(
             buildString {
                 append("Bin. ")
