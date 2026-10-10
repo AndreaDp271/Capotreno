@@ -1,0 +1,1 @@
+New bottom bar icons: train, station, ticket.

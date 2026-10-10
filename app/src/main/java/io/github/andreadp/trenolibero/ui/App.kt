@@ -4,11 +4,8 @@ import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -24,6 +21,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
+import io.github.andreadp.trenolibero.R
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -64,13 +63,14 @@ class Nav(private val c: NavHostController) {
     fun journey() = c.navigate("journey")
 }
 
-private data class Tab(val route: String, val label: String, val icon: ImageVector)
+/** Voce della barra: icona Material o disegno vettoriale dell'app. */
+private data class Tab(val route: String, val label: String, val icon: ImageVector? = null, val drawable: Int = 0)
 
 private val tabs = listOf(
-    Tab("home", "Treni", Icons.Default.Home),
-    Tab("stations", "Stazioni", Icons.Default.Search),
+    Tab("home", "Treni", drawable = R.drawable.ic_tab_train),
+    Tab("stations", "Stazioni", drawable = R.drawable.ic_tab_station),
     Tab("map", "Mappa", Icons.Default.Place),
-    Tab("tickets", "Biglietti", Icons.Default.Email),
+    Tab("tickets", "Biglietti", drawable = R.drawable.ic_tab_ticket),
     Tab("info", "Info", Icons.Default.Info),
 )
 
@@ -113,7 +113,9 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}) {
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(t.icon, null) },
+                        icon = {
+                            if (t.icon != null) Icon(t.icon, null) else Icon(painterResource(t.drawable), null)
+                        },
                         label = { Text(t.label) },
                     )
                 }

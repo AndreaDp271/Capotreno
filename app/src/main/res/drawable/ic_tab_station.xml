@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fabbricato viaggiatori: tetto a falde, orologio, porta e finestre, banchina -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M12,2L1.5,8.5V10.5H22.5V8.5ZM12,5a1.6,1.6 0,1 0,0.01 0ZM3,11.5H21V19H3ZM10,14H14V19H10ZM5,13H8V16H5ZM16,13H19V16H16Z" />
+    <path android:fillColor="#FF000000"
+        android:pathData="M1,20H23V22H1Z" />
+</vector>
