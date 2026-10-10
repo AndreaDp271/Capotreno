@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Scansione del codice del biglietto (QR, Aztec, PDF417, DataMatrix) con la fotocamera. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScanScreen(nav: Nav) {
+fun ScanScreen(nav: Nav, attachTo: String? = null) {
     val ctx = LocalContext.current
     var granted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
@@ -84,7 +84,8 @@ fun ScanScreen(nav: Nav) {
                     scope.launch {
                         val t = Graph.tickets.addScanned(result.barcodeFormat.name, result.text.orEmpty(), Graph.stations)
                         nav.back()
-                        nav.ticket(t.id)
+                        val sub = attachTo?.let { Graph.subscriptions.get(it) }
+                        if (sub != null) Graph.subscriptions.save(sub.copy(ticketId = t.id)) else nav.ticket(t.id)
                     }
                 }
                 Box(Modifier.size(260.dp).border(3.dp, Color.White, RoundedCornerShape(16.dp)))

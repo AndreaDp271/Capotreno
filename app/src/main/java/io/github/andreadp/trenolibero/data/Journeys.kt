@@ -194,6 +194,9 @@ object JourneySearch {
     }
 
     /** Treni diretti: partenze di A nelle prossime ~3 ore che fermano anche a B. */
+    /** Solo treni diretti, in tempo reale, di tutte le imprese su ViaggiaTreno (usato anche per gli abbonamenti). */
+    suspend fun direct(from: StationRef, to: StationRef, time: Date): List<Journey> = directFromBoards(from, to, time)
+
     private suspend fun directFromBoards(from: StationRef, to: StationRef, time: Date): List<Journey> = coroutineScope {
         val boards = (0..1).map { i ->
             async { runCatching { ViaggiaTrenoApi.departures(from.id, Date(time.time + i * 90 * 60_000L)) }.getOrDefault(emptyList()) }

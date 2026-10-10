@@ -102,6 +102,7 @@ object Graph {
     lateinit var stations: StationIndex
     lateinit var favorites: Favorites
     lateinit var tickets: TicketStore
+    lateinit var subscriptions: SubscriptionStore
     private lateinit var app: Context
 
     fun init(context: Context) {
@@ -110,6 +111,7 @@ object Graph {
         stations = StationIndex(app)
         favorites = Favorites(app)
         tickets = TicketStore(app)
+        subscriptions = SubscriptionStore(app)
     }
 
     private val railMutex = Mutex()

@@ -1,0 +1,1 @@
+Nuovo: abbonamenti. Tratta, tipo (regionale, Intercity, Frecce), operatore e validità; QR da mostrare al controllore; treni compatibili in tempo reale nei due sensi.

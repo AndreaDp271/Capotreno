@@ -12,6 +12,8 @@ Client Android libero e **non ufficiale** dei dati in tempo reale di
   e mostrato nitido al controllore, treno/data/carrozza/posto riconosciuti dai PDF (ZXing, PdfBox, CameraX: tutto offline)
 - **Cerca viaggio** da A a B: soluzioni anche con cambi e prezzi (servizio di vendita Trenitalia, lefrecce.it) e
   treni diretti di tutte le imprese presenti su ViaggiaTreno; filtri per tipo di treno e compagnia (Italo non disponibile)
+- **Abbonamenti**: tratta, tipo, operatore e validità (con avviso di scadenza), QR allegato da mostrare al controllore,
+  treni diretti compatibili in tempo reale nei due sensi
 - **Infomobilità**: avvisi divisi per circolazione, scioperi, lavori (per regione), altre info; treni in circolazione
 - **Preferiti** salvati solo sul dispositivo
 - Nessuna dipendenza proprietaria: niente Google Play Services, niente tracciamento

@@ -58,7 +58,10 @@ class Nav(private val c: NavHostController) {
 
     fun ticket(id: String) = c.navigate("ticket/${Uri.encode(id)}")
 
-    fun scan() = c.navigate("scan")
+    /** [attachTo]: id dell'abbonamento a cui allegare il codice scansionato. */
+    fun scan(attachTo: String? = null) = c.navigate(if (attachTo == null) "scan" else "scan?attach=${Uri.encode(attachTo)}")
+
+    fun subscription(id: String) = c.navigate("subscription/${Uri.encode(id)}")
 
     fun journey() = c.navigate("journey")
 }
@@ -128,7 +131,11 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}) {
             composable("map") { StationsMapScreen(nav, null) }
             composable("info") { InfoScreen(nav) }
             composable("tickets") { TicketsScreen(nav) }
-            composable("scan") { ScanScreen(nav) }
+            composable(
+                "scan?attach={attach}",
+                arguments = listOf(navArgument("attach") { type = NavType.StringType; nullable = true }),
+            ) { ScanScreen(nav, it.arguments?.getString("attach")) }
+            composable("subscription/{id}") { SubscriptionScreen(nav, it.arguments!!.getString("id")!!) }
             composable("journey") { JourneyScreen(nav) }
             composable("ticket/{id}") { TicketScreen(nav, it.arguments!!.getString("id")!!) }
             composable("line/{region}/{ab}/{ba}") {

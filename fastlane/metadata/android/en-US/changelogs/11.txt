@@ -1,0 +1,1 @@
+New: season tickets. Route, type (regional, Intercity, Frecce), operator and validity; QR for inspectors; compatible trains in real time both ways.

@@ -216,7 +216,7 @@ fun JourneyScreen(nav: Nav) {
 }
 
 /** Mezzanotte (Roma) del giorno di partenza: serve ad andamentoTreno. */
-private fun midnight(ms: Long): Long = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply {
+fun midnight(ms: Long): Long = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply {
     timeInMillis = ms
     set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
 }.timeInMillis
@@ -231,7 +231,7 @@ private fun duration(ms: Long): String {
 
 /** Campo stazione con suggerimenti durante la digitazione. */
 @Composable
-private fun StationField(label: String, value: StationRef?, onSelect: (StationRef?) -> Unit) {
+fun StationField(label: String, value: StationRef?, onSelect: (StationRef?) -> Unit) {
     var text by remember(value) { mutableStateOf(value?.name.orEmpty()) }
     var suggestions by remember { mutableStateOf<List<StationRef>>(emptyList()) }
     LaunchedEffect(text) {
@@ -292,7 +292,7 @@ private fun sellerFor(company: String): Seller = when (company) {
 private fun dayOf(l: JourneyLeg) = l.dateMs ?: midnight(l.departure)
 
 @Composable
-private fun JourneyCard(nav: Nav, j: Journey) {
+fun JourneyCard(nav: Nav, j: Journey, buy: Boolean = true) {
     var open by rememberSaveable { mutableStateOf(false) }
     val uri = LocalUriHandler.current
     val scope = rememberCoroutineScope()
@@ -387,7 +387,7 @@ private fun JourneyCard(nav: Nav, j: Journey) {
                             modifier = Modifier.weight(1f),
                         ) { Text("Visualizza treno") }
                     }
-                    sellers.forEach { s ->
+                    if (buy) sellers.forEach { s ->
                         Button(onClick = {
                             if (s.name == "Trenitalia") {
                                 // ricerca già compilata sul sito Trenitalia, a partire dall'ora di questa soluzione
@@ -398,7 +398,7 @@ private fun JourneyCard(nav: Nav, j: Journey) {
                         }
                     }
                 }
-                Text(
+                if (buy) Text(
                     if (sellers.any { it.name == "Trenitalia" })
                         "Si apre la ricerca Trenitalia per questa tratta e orario: scegli la soluzione e acquista."
                     else "L'acquisto avviene sul sito di ${sellers.joinToString(" / ") { it.name }}.",

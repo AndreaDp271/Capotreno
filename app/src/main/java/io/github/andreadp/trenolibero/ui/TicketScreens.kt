@@ -43,6 +43,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -81,7 +85,13 @@ suspend fun importTicket(uri: Uri): Result<Ticket> = runCatching { Graph.tickets
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TicketsScreen(nav: Nav) {
-    val tickets by Graph.tickets.tickets.collectAsState()
+    val allTickets by Graph.tickets.tickets.collectAsState()
+    val subs by Graph.subscriptions.items.collectAsState()
+    // i documenti allegati agli abbonamenti non compaiono tra i biglietti
+    val attached = subs.mapNotNull { it.ticketId }.toSet()
+    val tickets = allTickets.filter { it.id !in attached }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var newSub by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -93,9 +103,13 @@ fun TicketsScreen(nav: Nav) {
         }
     }
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Biglietti") }) },
+        topBar = { TopAppBar(title = { Text(if (tab == 0) "Biglietti" else "Abbonamenti") }) },
         floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (tab == 1) ExtendedFloatingActionButton(
+                onClick = { newSub = true },
+                icon = { Icon(Icons.Default.Add, null) },
+                text = { Text("Nuovo abbonamento") },
+            ) else Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ExtendedFloatingActionButton(
                     onClick = { nav.scan() },
                     icon = { Icon(painterResource(R.drawable.ic_qr_scan), null) },
@@ -110,6 +124,17 @@ fun TicketsScreen(nav: Nav) {
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
+            TabRow(selectedTabIndex = tab) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Biglietti") })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Abbonamenti (${subs.size})") })
+            }
+            if (tab == 1) {
+                SubscriptionsList(nav)
+                if (newSub) SubscriptionDialog(null, onDismiss = { newSub = false }) { s ->
+                    Graph.subscriptions.save(s); newSub = false; nav.subscription(s.id)
+                }
+                return@Column
+            }
             if (importing) LinearProgressIndicator(Modifier.fillMaxWidth())
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
             if (tickets.isEmpty()) {
