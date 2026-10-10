@@ -1,0 +1,2 @@
+I treni sulla mappa sono posizionati sui binari.
+Ritardo in rosso, anticipo in blu, in orario in verde.

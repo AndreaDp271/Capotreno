@@ -1,0 +1,2 @@
+Trains on the map are placed on the tracks.
+Delay in red, early in blue, on time in green.

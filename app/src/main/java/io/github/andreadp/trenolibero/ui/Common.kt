@@ -152,11 +152,11 @@ fun delayText(min: Int?): String = when {
     else -> "in orario"
 }
 
+/** Ritardo in rosso, anticipo in blu, in orario in verde. */
 fun delayColor(min: Int?): Color = when {
     min == null -> Color.Gray
     min < 0 -> Palette.early
-    min <= 4 -> Palette.onTime
-    min <= 15 -> Palette.late
+    min == 0 -> Palette.onTime
     else -> Palette.veryLate
 }
 
