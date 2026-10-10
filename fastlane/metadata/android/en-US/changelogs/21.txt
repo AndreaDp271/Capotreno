@@ -1,0 +1,1 @@
+Train map: modern colored cards for stops and train position, animated orange current leg, side zoom buttons under the location button. Train screen: line fixed with intermediate detections, predicted times at upcoming stops.

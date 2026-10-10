@@ -156,7 +156,9 @@ private class Position(a: Andamento, now: Long) {
                 else -> StopState.UPCOMING
             }
             val transitHere = inTransit && i == lastReached
-            add(TlRow.Stop(i, f, state, seg(i - 1), seg(i)))
+            // se il treno è stato rilevato dopo la fermata, il tratto fino al rilevamento è già percorso
+            val detAfter = transitHere && detection != null && !detectionIsStop
+            add(TlRow.Stop(i, f, state, seg(i - 1), if (detAfter) Seg.PASSED else seg(i)))
             if (transitHere) {
                 add(TlRow.Transit(f, stops[next], detection?.takeIf { !detectionIsStop }, a.oraUltimoRilevamento, legProgress))
             }

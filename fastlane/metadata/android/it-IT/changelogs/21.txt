@@ -1,0 +1,1 @@
+Mappa del treno: schede moderne e colorate per fermate e posizione del treno, tratto in corso arancione animato, zoom laterale sotto il pulsante posizione. Schermata del treno: linea corretta con i rilevamenti intermedi, orari previsti sulle fermate future.
