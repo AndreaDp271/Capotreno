@@ -1,4 +1,4 @@
-<p>TrenoLibero è un client libero e non ufficiale dei dati di infomobilità pubblicati su ViaggiaTreno (RFI/Trenitalia). Mostra le stesse informazioni del sito, in un'app leggera e senza pubblicità né tracciamento.</p>
+<p>Capotreno è un client libero e non ufficiale dei dati di infomobilità pubblicati su ViaggiaTreno (RFI/Trenitalia). Mostra le stesse informazioni del sito, in un'app leggera e senza pubblicità né tracciamento.</p>
 <p><b>Funzioni</b></p>
 <ul>
 <li><b>Andamento treno</b>: cerca per numero e vedi tutte le fermate con orari programmati, effettivi e previsti, ritardo, ultimo rilevamento, binari programmati ed effettivi (evidenziati se cambiano), fermate soppresse.</li>

@@ -1,4 +1,4 @@
-# TrenoLibero
+# Capotreno
 
 Client Android libero e **non ufficiale** dei dati in tempo reale di
 [ViaggiaTreno](http://www.viaggiatreno.it/infomobilita/index.jsp) (RFI/Trenitalia).
@@ -80,12 +80,13 @@ L'API può cambiare senza preavviso. Su F-Droid l'app porta l'anti-feature **Non
 
 ## Pubblicazione su F-Droid
 
-1. Pubblicare il repository su GitHub/GitLab e creare il tag `v1.0.0`.
-2. Se l'utente non è `andreadp`, cambiare `applicationId`/`namespace` in `app/build.gradle.kts`
-   (per convenzione `io.github.<utente>.trenolibero`).
-3. Fare fork di [fdroiddata](https://gitlab.com/fdroid/fdroiddata), copiare
-   `metadata/io.github.andreadp.trenolibero.yml` sostituendo `TUO_UTENTE`, verificare con
-   `fdroid lint` / `fdroid build` e aprire una merge request.
+1. Pubblicare il repository su `github.com/AndreaDp271/Capotreno` con tutti i tag.
+2. Fare fork di [fdroiddata](https://gitlab.com/fdroid/fdroiddata), copiare
+   `metadata/io.github.andreadp271.capotreno.yml` (già verificata con `fdroid lint`)
+   e aprire una merge request.
+
+L'`applicationId` è `io.github.andreadp271.capotreno` (dominio GitHub dell'autore, come richiesto da F-Droid);
+il package Kotlin interno resta `io.github.andreadp.trenolibero`.
 
 Descrizioni e changelog per lo store sono in `fastlane/metadata/android/`.
 

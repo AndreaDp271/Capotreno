@@ -165,7 +165,7 @@ fun TicketsScreen(nav: Nav) {
             if (tickets.isEmpty()) {
                 EmptyText(
                     "Importa il biglietto in PDF (Trenitalia, Italo, regionale…) oppure uno screenshot o una foto, " +
-                        "anche condividendolo con TrenoLibero dall'app di posta o dalla galleria.\n\n" +
+                        "anche condividendolo con Capotreno dall'app di posta o dalla galleria.\n\n" +
                         "L'app estrae il QR code da mostrare al controllore, riconosce treno, data, stazioni, " +
                         "carrozza e posto (dai PDF) e ti porta all'andamento del treno. Tutto resta sul telefono."
                 )

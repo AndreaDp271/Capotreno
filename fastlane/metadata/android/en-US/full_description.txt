@@ -1,4 +1,4 @@
-<p>TrenoLibero is a free and unofficial client for the Italian railway real-time data published by ViaggiaTreno (RFI/Trenitalia). It shows the same information as the website in a lightweight app without ads or tracking.</p>
+<p>Capotreno is a free and unofficial client for the Italian railway real-time data published by ViaggiaTreno (RFI/Trenitalia). It shows the same information as the website in a lightweight app without ads or tracking.</p>
 <ul>
 <li><b>Train status</b>: search by number to see every stop with scheduled, actual and expected times, delay, last detection point, scheduled and actual platforms, cancelled stops.</li>
 <li><b>Station board</b>: real-time departures and arrivals with delays and platforms, also from a chosen time.</li>

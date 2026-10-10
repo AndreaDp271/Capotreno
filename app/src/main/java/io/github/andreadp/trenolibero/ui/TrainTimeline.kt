@@ -117,7 +117,7 @@ private class Position(a: Andamento, now: Long) {
         val to = stops[next]
         val start = from.partenzaReale ?: from.arrivoReale
         val sched = to.arrivoTeorico ?: to.programmata
-        val delayMin = to.ritardo ?: a.ritardo ?: 0
+        val delayMin = to.ritardo?.takeIf { it != 0 } ?: a.ritardo ?: 0
         if (start == null || sched == null) null
         else {
             val end = sched + delayMin * 60_000L
@@ -456,12 +456,15 @@ private fun StopRow(
                 Text("Fermata soppressa", color = Palette.veryLate, style = MaterialTheme.typography.bodySmall)
             } else {
                 // Per le fermate non ancora raggiunte si mostra l'orario previsto (programmato + ritardo attuale)
-                val predictDelay = if (trainStarted && !f.reached) (f.ritardo ?: a.ritardo) else null
+                // ViaggiaTreno mette ritardo 0 sulle fermate future: in quel caso vale il ritardo attuale del treno
+                val delayNow = f.ritardo?.takeIf { it != 0 } ?: a.ritardo
+                val predictArr = if (trainStarted && f.arrivoReale == null) delayNow else null
+                val predictDep = if (trainStarted && f.partenzaReale == null) delayNow else null
                 if (f.tipoFermata != "P" && f.arrivoTeorico != null) {
-                    TimeLine("Arr.", f.arrivoTeorico, f.arrivoReale, f.ritardoArrivo, predictDelay, dim)
+                    TimeLine("Arr.", f.arrivoTeorico, f.arrivoReale, f.ritardoArrivo, predictArr, dim)
                 }
                 if (f.tipoFermata != "A" && f.partenzaTeorica != null) {
-                    TimeLine("Part.", f.partenzaTeorica, f.partenzaReale, f.ritardoPartenza, predictDelay, dim)
+                    TimeLine("Part.", f.partenzaTeorica, f.partenzaReale, f.ritardoPartenza, predictDep, dim)
                 }
             }
         }
@@ -510,7 +513,7 @@ private fun TransitRow(r: TlRow.Transit, a: Andamento, dash: () -> Float, pulse:
                     else r.from?.let { f -> (f.partenzaReale ?: f.arrivoReale)?.let { add("partito da ${f.stazione} alle ${fmtTime(it)}") } }
                     r.to?.let { t ->
                         val sched = t.arrivoTeorico ?: t.programmata
-                        val d = t.ritardo ?: a.ritardo ?: 0
+                        val d = t.ritardo?.takeIf { it != 0 } ?: a.ritardo ?: 0
                         if (sched != null) add("arrivo previsto ${fmtTime(sched + d * 60_000L)}")
                     }
                 }
