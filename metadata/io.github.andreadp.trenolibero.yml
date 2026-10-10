@@ -1,0 +1,31 @@
+# Bozza della ricetta per il repository fdroiddata (https://gitlab.com/fdroid/fdroiddata)
+# Sostituire TUO_UTENTE con il proprio utente GitHub prima di aprire la merge request.
+AntiFeatures:
+  NonFreeNet:
+    it: Usa l'API non libera di viaggiatreno.it (RFI/Trenitalia).
+    en-US: Uses the non-free viaggiatreno.it API (RFI/Trenitalia).
+Categories:
+  - Navigation
+  - Travel
+License: GPL-3.0-or-later
+AuthorName: andreadp
+SourceCode: https://github.com/TUO_UTENTE/TrenoLibero
+IssueTracker: https://github.com/TUO_UTENTE/TrenoLibero/issues
+
+AutoName: TrenoLibero
+
+RepoType: git
+Repo: https://github.com/TUO_UTENTE/TrenoLibero.git
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1

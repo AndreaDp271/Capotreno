@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Treno frontale stilizzato (108dp, zona sicura centrale 66dp) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- carrozzeria -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M42,28h24a8,8 0,0 1,8 8v28a8,8 0,0 1,-8 8H42a8,8 0,0 1,-8 -8V36a8,8 0,0 1,8 -8z" />
+    <!-- carrelli -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M42,72l-6,8h5l6,-8zM66,72l6,8h-5l-6,-8z" />
+    <!-- parabrezza -->
+    <path
+        android:fillColor="#FF0B5D3B"
+        android:pathData="M40,36h28v15H40z" />
+    <!-- fari -->
+    <path
+        android:fillColor="#FF0B5D3B"
+        android:pathData="M38.5,62a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0zM62.5,62a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0z" />
+    <!-- binario -->
+    <path
+        android:fillColor="#FFFFC107"
+        android:pathData="M28,82h52v3H28z" />
+</vector>

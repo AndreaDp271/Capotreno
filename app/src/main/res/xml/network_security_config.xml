@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- L'API di ViaggiaTreno è servita solo in HTTP (HTTPS fa redirect a HTTP).
+     Il traffico in chiaro è consentito esclusivamente per questo dominio. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">viaggiatreno.it</domain>
+    </domain-config>
+</network-security-config>

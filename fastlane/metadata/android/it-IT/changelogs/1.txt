@@ -1,0 +1,1 @@
+Prima versione: andamento treni, tabelloni di stazione, mappa delle stazioni e del percorso, infomobilità, preferiti.

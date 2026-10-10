@@ -1,0 +1,11 @@
+<p>TrenoLibero è un client libero e non ufficiale dei dati di infomobilità pubblicati su ViaggiaTreno (RFI/Trenitalia). Mostra le stesse informazioni del sito, in un'app leggera e senza pubblicità né tracciamento.</p>
+<p><b>Funzioni</b></p>
+<ul>
+<li><b>Andamento treno</b>: cerca per numero e vedi tutte le fermate con orari programmati, effettivi e previsti, ritardo, ultimo rilevamento, binari programmati ed effettivi (evidenziati se cambiano), fermate soppresse.</li>
+<li><b>Tabellone di stazione</b>: partenze e arrivi in tempo reale con ritardi e binari, anche a partire da un orario a scelta.</li>
+<li><b>Mappa</b> (OpenStreetMap): tutte le stazioni della rete e il percorso del treno con la posizione dell'ultimo rilevamento.</li>
+<li><b>Infomobilità</b>: avvisi sulla circolazione, notizie in evidenza e numero di treni in circolazione.</li>
+<li><b>Preferiti</b>: treni e stazioni salvati solo sul dispositivo.</li>
+<li>Aggiornamento automatico ogni minuto, tema chiaro/scuro.</li>
+</ul>
+<p>L'app non è affiliata né approvata da Trenitalia, RFI o Gruppo FS. I dati provengono dal servizio pubblico viaggiatreno.it, che non è software libero (per questo l'app è segnalata con l'anti-feature "Servizio di rete non libero").</p>
