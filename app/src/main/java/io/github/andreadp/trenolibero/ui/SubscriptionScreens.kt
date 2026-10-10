@@ -241,9 +241,26 @@ fun SubscriptionScreen(nav: Nav, id: String) {
                 if (trains.loading && trains.data == null) LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp))
                 trains.error?.let { EmptyText(it) }
             }
-            val list = trains.data.orEmpty()
+            val list = trains.data?.compatible.orEmpty()
+            val others = trains.data?.others.orEmpty()
             if (trains.data != null && list.isEmpty()) item {
-                EmptyText("Nessun treno compatibile nelle prossime ore")
+                if (others.isEmpty()) {
+                    EmptyText("Nessun treno diretto nelle prossime ore")
+                } else {
+                    // probabilmente tipo o operatore dell'abbonamento non corrispondono ai treni della tratta
+                    val kinds = others.flatMap { it.legs }.map { it.kind.label }.distinct().joinToString(", ")
+                    val companies = others.flatMap { it.companies }.distinct().joinToString(", ")
+                    Card(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Nessun treno compatibile con: ${s.type.label} · ${s.operator.label}", fontWeight = FontWeight.Bold)
+                            Text("Sulla tratta ci sono ${others.size} treni diretti di tipo $kinds ($companies). Il tipo o l'operatore dell'abbonamento sono corretti?")
+                            Button(onClick = { editing = true }) { Text("Correggi l'abbonamento") }
+                        }
+                    }
+                }
             }
             items(list) { j -> JourneyCard(nav, j, buy = false) }
             item { Box(Modifier.height(24.dp)) }

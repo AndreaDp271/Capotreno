@@ -1,0 +1,1 @@
+Season tickets from PDF: type recognised correctly (CartaFRECCIA no longer makes it high-speed); hint when type or operator don't match the trains on the route.

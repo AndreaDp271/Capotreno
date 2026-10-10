@@ -123,4 +123,12 @@ class FeaturesTest {
         assertEquals("04/12/2026", av.validTo)
         assertEquals("HIGH_SPEED", av.subscriptionType)
     }
+
+    @Test
+    fun cartaFrecciaNonRendeAv() {
+        val t = TicketParser.parse("ABBONAMENTO MENSILE Castelfranco Veneto - Padova. Punti CartaFRECCIA: 0. Valido dal 01/12/2026 al 31/12/2026", stations)
+        assertEquals("REGIONAL", t.subscriptionType)
+        val av = TicketParser.parse("Abbonamento Frecciarossa Milano - Torino. Punti CartaFRECCIA", stations)
+        assertEquals("HIGH_SPEED", av.subscriptionType)
+    }
 }

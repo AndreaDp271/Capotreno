@@ -104,10 +104,15 @@ class SubscriptionStore(context: Context) {
     fun delete(id: String) = write(_items.value.filterNot { it.id == id })
 }
 
+/** Treni diretti tra le stazioni dell'abbonamento: compatibili e non (per segnalare un tipo impostato male). */
+class CompatibleTrains(val compatible: List<Journey>, val others: List<Journey>)
+
 /** Treni diretti compatibili con un abbonamento, nel verso indicato. */
-suspend fun compatibleTrains(sub: Subscription, reverse: Boolean, time: Date): List<Journey> {
+suspend fun compatibleTrains(sub: Subscription, reverse: Boolean, time: Date): CompatibleTrains {
     val a = StationRef(sub.fromId, sub.fromName)
     val b = StationRef(sub.toId, sub.toName)
     val (from, to) = if (reverse) b to a else a to b
-    return JourneySearch.direct(from, to, time).filter { sub.accepts(it) }.sortedBy { it.departure }
+    val all = JourneySearch.direct(from, to, time).sortedBy { it.departure }
+    val (ok, other) = all.partition { sub.accepts(it) }
+    return CompatibleTrains(ok, other)
 }

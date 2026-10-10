@@ -44,8 +44,8 @@ class SubscriptionTest {
     fun treniCompatibiliDalVivo() = runBlocking<Unit> {
         assumeTrue(!System.getenv("LIVE_API").isNullOrEmpty())
         val s = base.copy(type = SubscriptionType.REGIONAL, operator = SubscriptionOperator.TRENITALIA)
-        val andata = compatibleTrains(s, reverse = false, Date())
-        val ritorno = compatibleTrains(s, reverse = true, Date())
+        val andata = compatibleTrains(s, reverse = false, Date()).compatible
+        val ritorno = compatibleTrains(s, reverse = true, Date()).compatible
         println("Padova -> Venezia: ${andata.size} regionali compatibili; ritorno: ${ritorno.size}")
         andata.take(5).forEach { println("   ${it.legs.single().title} ${it.legs.single().company} rit=${it.delay} bin=${it.platform}") }
         assertTrue(andata.all { j -> j.legs.all { it.kind == TrainKind.REGIONAL } })

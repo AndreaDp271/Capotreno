@@ -294,9 +294,12 @@ object TicketParser {
         val range = validRangeRx.find(t)
         val from = range?.groupValues?.get(1) ?: validFromRx.find(t)?.groupValues?.get(1)
         val to = range?.groupValues?.get(2) ?: validToRx.findAll(t).map { it.groupValues[1] }.lastOrNull()
+        // "CartaFRECCIA" (programma fedeltà) compare su quasi tutti i PDF Trenitalia: non indica il tipo di treno
+        val clean = lower.replace("cartafreccia", "").replace("carta freccia", "")
         val type = when {
-            "frecc" in lower || "alta velocit" in lower || "\\bav\\b".toRegex().containsMatchIn(lower) -> "HIGH_SPEED"
-            "intercity" in lower -> "INTERCITY"
+            "regional" in clean -> "REGIONAL"
+            "intercity" in clean -> "INTERCITY"
+            Regex("frecciarossa|frecciargento|frecciabianca|abbonamento frecce|alta velocit").containsMatchIn(clean) -> "HIGH_SPEED"
             else -> "REGIONAL"
         }
         val operator = when {

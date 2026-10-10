@@ -1,0 +1,1 @@
+Abbonamenti da PDF: tipo riconosciuto correttamente (la scritta CartaFRECCIA non lo rende più Frecce/AV); avviso se tipo o operatore non corrispondono ai treni della tratta.
