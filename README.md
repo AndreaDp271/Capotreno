@@ -10,7 +10,9 @@ Client Android libero e **non ufficiale** dei dati in tempo reale di
 - **Ultimo rilevamento** anche in punti che non sono fermate (posti di comunicazione, bivi) e storico dei rilevamenti
 - **Biglietti**: importazione di PDF e immagini (anche da "Condividi") o scansione con la fotocamera; il QR/Aztec viene estratto
   e mostrato nitido al controllore, treno/data/carrozza/posto riconosciuti dai PDF (ZXing, PdfBox, CameraX: tutto offline)
-- **Infomobilità**: avvisi di circolazione, notizie in evidenza, treni in circolazione
+- **Cerca viaggio** da A a B: soluzioni anche con cambi e prezzi (servizio di vendita Trenitalia, lefrecce.it) e
+  treni diretti di tutte le imprese presenti su ViaggiaTreno; filtri per tipo di treno e compagnia (Italo non disponibile)
+- **Infomobilità**: avvisi divisi per circolazione, scioperi, lavori (per regione), altre info; treni in circolazione
 - **Preferiti** salvati solo sul dispositivo
 - Nessuna dipendenza proprietaria: niente Google Play Services, niente tracciamento
 

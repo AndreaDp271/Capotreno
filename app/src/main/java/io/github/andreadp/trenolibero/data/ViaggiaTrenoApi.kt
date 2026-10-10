@@ -154,8 +154,9 @@ object ViaggiaTrenoApi {
             .findAll(html).map { stripTags(it.groupValues[1]) }.filter { it.isNotBlank() }.toList()
     }
 
-    suspend fun infomobility(): List<InfoNews> {
-        val html = get("infomobilitaRSS/false")
+    /** [works] = true: avvisi "infolavori" per regione (lavori programmati). */
+    suspend fun infomobility(works: Boolean = false): List<InfoNews> {
+        val html = get("infomobilitaRSS/$works")
         val titleRx = Regex("<a[^>]*class=\"([^\"]*)\"[^>]*>(.*?)</a>", RegexOption.DOT_MATCHES_ALL)
         val dateRx = Regex("<h4>(.*?)</h4>", RegexOption.DOT_MATCHES_ALL)
         val bodyRx = Regex("<div class=\"info-text[^\"]*\">(.*)", RegexOption.DOT_MATCHES_ALL)

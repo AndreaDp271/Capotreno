@@ -90,4 +90,14 @@ class FeaturesTest {
         assertEquals("FORLI", DetectionLocator.normalize("FORLI'"))
     }
 
+
+    @Test
+    fun categorieAvvisi() {
+        fun c(title: String, works: Boolean = false) = categorize(InfoNews(title, "", "", false), works)
+        assertEquals(InfoCategory.CIRCULATION, c("Linea Bari - Taranto: circolazione fortemente rallentata dalle ore 8:00"))
+        assertEquals(InfoCategory.CIRCULATION, c("CIRCOLAZIONE REGOLARE SULLA RETE ALTA VELOCITÀ"))
+        assertEquals(InfoCategory.STRIKE, c("Regione Toscana: dalle ore 9:01 alle ore 17:00 di mercoledì 14 ottobre sciopero del personale"))
+        assertEquals(InfoCategory.WORKS, c("INFOLAVORI LOMBARDIA", works = true))
+        assertEquals(InfoCategory.OTHER, c("INFOTRENI FRECCE"))
+    }
 }

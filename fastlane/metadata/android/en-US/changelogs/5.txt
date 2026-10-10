@@ -1,0 +1,3 @@
+New: journey search between two stations, with Trenitalia connections and direct trains of all operators on ViaggiaTreno; filters for high-speed, Intercity, regional, direct only and operator.
+Info: notices split into service, strikes, engineering works and other.
+Map: trains shown as a dot with a direction arrow.

@@ -1,0 +1,3 @@
+Nuovo: cerca viaggio da stazione a stazione, con soluzioni e cambi Trenitalia e treni diretti di tutte le imprese su ViaggiaTreno; filtri per Frecce/AV, Intercity, regionali, solo diretti e compagnia.
+Info: avvisi divisi in circolazione, scioperi, lavori e altre informazioni.
+Mappa: i treni sono un pallino con la freccia della direzione di marcia.

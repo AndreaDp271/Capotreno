@@ -96,6 +96,8 @@ data class BoardEntry(
     val nonPartito: Boolean? = null,
     val provvedimento: Int? = null,
     val arrivato: Boolean? = null,
+    /** Impresa ferroviaria: 1/2/4 Trenitalia, 18 TPER, 63 Trenord, 64 ÖBB… */
+    val codiceCliente: Int? = null,
 ) {
     val title: String get() = compNumeroTreno?.trim()?.takeIf { it.isNotEmpty() } ?: "$numeroTreno"
 }
@@ -126,6 +128,23 @@ data class Statistiche(
 
 /** Avviso di infomobilità estratto dall'HTML del servizio. */
 data class InfoNews(val title: String, val date: String, val html: String, val highlighted: Boolean)
+
+enum class InfoCategory(val label: String) {
+    CIRCULATION("Circolazione"), STRIKE("Scioperi"), WORKS("Lavori"), OTHER("Altre info"),
+}
+
+/** Categoria dell'avviso dal titolo (e dal testo): scioperi, lavori, circolazione, altro. */
+fun categorize(n: InfoNews, fromWorksFeed: Boolean): InfoCategory {
+    val t = n.title.lowercase()
+    val body = n.html.lowercase()
+    return when {
+        "sciop" in t || "sciopero" in body.take(400) -> InfoCategory.STRIKE
+        fromWorksFeed || "lavori" in t || "infolavori" in t || "interruzione programmata" in t -> InfoCategory.WORKS
+        listOf("circolazione", "rallentat", "sospes", "ritard", "inconvenient", "guasto", "linea ", "interrott", "deviat", "regolare")
+            .any { it in t } -> InfoCategory.CIRCULATION
+        else -> InfoCategory.OTHER
+    }
+}
 
 /** Linea (tratta) della mappa: segmento tra due nodi, "occupata" se ci sono treni in transito. */
 @Serializable

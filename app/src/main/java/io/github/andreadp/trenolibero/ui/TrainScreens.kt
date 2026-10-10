@@ -117,6 +117,13 @@ fun TrainSearchScreen(nav: Nav) {
                 )
                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                 error?.let { EmptyText(it) }
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { nav.journey() },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    Icon(Icons.Default.Search, null)
+                    Text("  Cerca un viaggio da una stazione a un'altra")
+                }
             }
             results?.let { list ->
                 item { SectionTitle("Più treni con questo numero") }

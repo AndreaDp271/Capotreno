@@ -36,23 +36,31 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import io.github.andreadp.trenolibero.data.InfoCategory
 import io.github.andreadp.trenolibero.data.InfoNews
+import io.github.andreadp.trenolibero.data.categorize
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import io.github.andreadp.trenolibero.data.Statistiche
 import io.github.andreadp.trenolibero.data.ViaggiaTrenoApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
-private class InfoData(val stats: Statistiche?, val ticker: List<String>, val news: List<InfoNews>)
+private class InfoData(val stats: Statistiche?, val ticker: List<String>, val news: Map<InfoCategory, List<InfoNews>>)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InfoScreen(nav: Nav) {
+    var tab by rememberSaveable { mutableStateOf(InfoCategory.CIRCULATION) }
     val state = rememberLoader(Unit, refreshMs = 120_000) {
         coroutineScope {
             val s = async { runCatching { ViaggiaTrenoApi.statistics() }.getOrNull() }
             val t = async { runCatching { ViaggiaTrenoApi.ticker() }.getOrDefault(emptyList()) }
-            val n = async { ViaggiaTrenoApi.infomobility() }
-            InfoData(s.await(), t.await(), n.await())
+            val n = async { ViaggiaTrenoApi.infomobility(works = false) }
+            val w = async { runCatching { ViaggiaTrenoApi.infomobility(works = true) }.getOrDefault(emptyList()) }
+            val grouped = (n.await().map { it to categorize(it, false) } + w.await().map { it to categorize(it, true) })
+                .groupBy({ it.second }, { it.first })
+            InfoData(s.await(), t.await(), grouped)
         }
     }
     Scaffold(
@@ -80,9 +88,20 @@ fun InfoScreen(nav: Nav) {
                             }
                         }
                     }
-                    item { SectionTitle("Avvisi sulla circolazione") }
-                    if (d.news.isEmpty()) item { EmptyText("Nessun avviso") }
-                    items(d.news) { n -> NewsCard(n) }
+                    item {
+                        TabRow(selectedTabIndex = tab.ordinal, modifier = Modifier.padding(top = 8.dp)) {
+                            InfoCategory.entries.forEach { c ->
+                                Tab(
+                                    selected = tab == c,
+                                    onClick = { tab = c },
+                                    text = { Text("${c.label} (${d.news[c]?.size ?: 0})", maxLines = 1, style = MaterialTheme.typography.labelMedium) },
+                                )
+                            }
+                        }
+                    }
+                    val list = d.news[tab].orEmpty()
+                    if (list.isEmpty()) item { EmptyText("Nessun avviso in questa categoria") }
+                    items(list) { n -> NewsCard(n) }
                     item {
                         Text(
                             "Dati: ViaggiaTreno (RFI/Trenitalia). App non ufficiale.\n" +

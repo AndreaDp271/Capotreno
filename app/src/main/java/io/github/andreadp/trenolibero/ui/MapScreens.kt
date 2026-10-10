@@ -259,8 +259,8 @@ fun StationsMapScreen(nav: Nav, focusId: String?) {
         val markers = trains.map { tr ->
             Marker(map).apply {
                 position = GeoPoint(tr.detection.lat, tr.detection.lon)
-                icon = ContextCompat.getDrawable(ctx, R.drawable.train_pin)
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                icon = TrainMarker.icon(ctx, TrainMarker.bearingAlong(tr.segment))
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 infoWindow = null
                 setOnMarkerClickListener { _, _ -> selected = null; selectedLine = null; selectedTrain = tr; true }
             }
@@ -587,8 +587,16 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
                             }
                             if (last && a.ritardo != null) append("\n${delayText(a.ritardo)}")
                         }
-                        icon = ContextCompat.getDrawable(ctx, if (last) R.drawable.train_pin else R.drawable.detection_dot)
-                        setAnchor(Marker.ANCHOR_CENTER, if (last) Marker.ANCHOR_BOTTOM else Marker.ANCHOR_CENTER)
+                        icon = if (last) {
+                            // direzione di marcia: lungo il percorso a partire dal punto del rilevamento
+                            val from = allRoute.indices.minByOrNull {
+                                DetectionLocator.distanceKm(allRoute[it].latitude, allRoute[it].longitude, p.latitude, p.longitude)
+                            }
+                            val bearing = if (a.arrivato == true || from == null) null
+                            else TrainMarker.bearingAlong(allRoute.drop(from).map { LatLon(it.latitude, it.longitude) })
+                            TrainMarker.icon(ctx, bearing)
+                        } else ContextCompat.getDrawable(ctx, R.drawable.detection_dot)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                         setOnMarkerClickListener { m, _ -> m.showInfoWindow(); true }
                     })
                 }

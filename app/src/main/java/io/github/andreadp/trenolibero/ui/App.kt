@@ -60,6 +60,8 @@ class Nav(private val c: NavHostController) {
     fun ticket(id: String) = c.navigate("ticket/${Uri.encode(id)}")
 
     fun scan() = c.navigate("scan")
+
+    fun journey() = c.navigate("journey")
 }
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
@@ -125,6 +127,7 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}) {
             composable("info") { InfoScreen(nav) }
             composable("tickets") { TicketsScreen(nav) }
             composable("scan") { ScanScreen(nav) }
+            composable("journey") { JourneyScreen(nav) }
             composable("ticket/{id}") { TicketScreen(nav, it.arguments!!.getString("id")!!) }
             composable("line/{region}/{ab}/{ba}") {
                 val a = it.arguments!!
