@@ -49,8 +49,39 @@ object Updater {
 
     fun fromFDroid(ctx: Context) = installer(ctx) in stores
 
-    /** Ultima release pubblicata su GitHub. */
+    private const val REPO = "https://github.com/AndreaDp271/Capotreno"
+    private const val RAW = "https://raw.githubusercontent.com/AndreaDp271/Capotreno"
+
+    /**
+     * Ultima release pubblicata su GitHub. L'API ha un limite di 60 richieste l'ora per rete:
+     * se risponde con un errore si ricava la versione dalla pagina delle release.
+     */
     suspend fun latest(): Release = withContext(Dispatchers.IO) {
+        try {
+            fromApi()
+        } catch (e: java.net.UnknownHostException) {
+            throw e
+        } catch (e: IOException) {
+            runCatching { fromPage() }.getOrElse { throw e }
+        }
+    }
+
+    /** Senza API: il tag arriva dal redirect di /releases/latest, le note dal changelog nel repository. */
+    private fun fromPage(): Release {
+        val noRedirect = client.newBuilder().followRedirects(false).build()
+        val location = noRedirect.newCall(Request.Builder().url("$REPO/releases/latest").build()).execute().use { it.header("Location") }
+            ?: throw IOException("Nessuna release trovata")
+        val tag = location.substringAfterLast("/tag/", "").ifEmpty { throw IOException("Nessuna release trovata") }
+        val version = tag.removePrefix("v")
+        fun raw(path: String) = runCatching {
+            client.newCall(Request.Builder().url("$RAW/$tag/$path").build()).execute().use { if (it.isSuccessful) it.body!!.string() else null }
+        }.getOrNull()
+        val code = raw("app/build.gradle.kts")?.let { Regex("""versionCode = (\d+)""").find(it)?.groupValues?.get(1) }
+        val notes = code?.let { raw("fastlane/metadata/android/it-IT/changelogs/$it.txt") }.orEmpty().trim()
+        return Release(version, "$REPO/releases/download/$tag/Capotreno-$version.apk", notes, location)
+    }
+
+    private fun fromApi(): Release {
         val req = Request.Builder().url(API).header("Accept", "application/vnd.github+json").build()
         val body = client.newCall(req).execute().use { r ->
             if (!r.isSuccessful) throw IOException("GitHub ha risposto ${r.code}")
@@ -60,7 +91,7 @@ object Updater {
         val apk = o["assets"]?.jsonArray?.map { it.jsonObject }
             ?.firstOrNull { it["name"]?.jsonPrimitive?.content.orEmpty().endsWith(".apk") }
             ?: throw IOException("Nessun APK nell'ultima release")
-        Release(
+        return Release(
             version = o["tag_name"]!!.jsonPrimitive.content.removePrefix("v"),
             apkUrl = apk["browser_download_url"]!!.jsonPrimitive.content,
             notes = o["body"]?.jsonPrimitive?.content.orEmpty().trim(),
