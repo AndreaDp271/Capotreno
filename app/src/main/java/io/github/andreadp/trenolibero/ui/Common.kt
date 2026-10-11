@@ -53,15 +53,52 @@ private val Green = Color(0xFF0B5D3B)
 @Composable
 fun TrenoTheme(content: @Composable () -> Unit) {
     val dark = isDarkTheme()
-    val dynamic by io.github.andreadp.trenolibero.data.AppSettings.dynamicColor.collectAsState()
+    val palette by io.github.andreadp.trenolibero.data.AppSettings.palette.collectAsState()
     val ctx = LocalContext.current
     val scheme = when {
-        Build.VERSION.SDK_INT >= 31 && dynamic -> if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
+        palette == io.github.andreadp.trenolibero.data.AppSettings.Palette.PAPER -> if (dark) PaperDark else PaperLight
+        Build.VERSION.SDK_INT >= 31 && palette == io.github.andreadp.trenolibero.data.AppSettings.Palette.DYNAMIC ->
+            if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
         dark -> darkColorScheme(primary = Color(0xFF7FD8A6), secondary = Color(0xFFFFC107))
         else -> lightColorScheme(primary = Green, secondary = Color(0xFF8A6D00))
     }
     MaterialTheme(colorScheme = scheme, content = content)
 }
+
+// Carta: fondo avorio, inchiostro quasi nero, un solo accento rosso; superfici piatte senza riflessi colorati.
+private val PaperLight = lightColorScheme(
+    primary = Color(0xFF1F1D1A), onPrimary = Color(0xFFF7F4EC),
+    primaryContainer = Color(0xFFE6E0D3), onPrimaryContainer = Color(0xFF1F1D1A),
+    secondary = Color(0xFF5E584E), onSecondary = Color(0xFFF7F4EC),
+    secondaryContainer = Color(0xFFE9E3D6), onSecondaryContainer = Color(0xFF1F1D1A),
+    tertiary = Color(0xFFB0372A), onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFF3D9D3), onTertiaryContainer = Color(0xFF4A120B),
+    background = Color(0xFFF4F0E6), onBackground = Color(0xFF1F1D1A),
+    surface = Color(0xFFF4F0E6), onSurface = Color(0xFF1F1D1A),
+    surfaceVariant = Color(0xFFE8E2D5), onSurfaceVariant = Color(0xFF5E584E),
+    surfaceTint = Color.Transparent,
+    surfaceContainerLowest = Color(0xFFFBF9F3), surfaceContainerLow = Color(0xFFF8F5EE),
+    surfaceContainer = Color(0xFFEFEADF), surfaceContainerHigh = Color(0xFFEAE4D8), surfaceContainerHighest = Color(0xFFE4DDCF),
+    outline = Color(0xFF8C8577), outlineVariant = Color(0xFFD6CFC0),
+    error = Color(0xFFB0372A), onError = Color(0xFFFFFFFF),
+)
+
+private val PaperDark = darkColorScheme(
+    primary = Color(0xFFEDE7DA), onPrimary = Color(0xFF1C1B18),
+    primaryContainer = Color(0xFF3A3731), onPrimaryContainer = Color(0xFFEDE7DA),
+    secondary = Color(0xFFB9B1A2), onSecondary = Color(0xFF1C1B18),
+    secondaryContainer = Color(0xFF34312C), onSecondaryContainer = Color(0xFFEDE7DA),
+    tertiary = Color(0xFFE8857A), onTertiary = Color(0xFF3B0D07),
+    tertiaryContainer = Color(0xFF5A1F18), onTertiaryContainer = Color(0xFFF7D9D4),
+    background = Color(0xFF1C1B18), onBackground = Color(0xFFEDE7DA),
+    surface = Color(0xFF1C1B18), onSurface = Color(0xFFEDE7DA),
+    surfaceVariant = Color(0xFF2E2C27), onSurfaceVariant = Color(0xFFB9B1A2),
+    surfaceTint = Color.Transparent,
+    surfaceContainerLowest = Color(0xFF161512), surfaceContainerLow = Color(0xFF22211D),
+    surfaceContainer = Color(0xFF262420), surfaceContainerHigh = Color(0xFF2E2C27), surfaceContainerHighest = Color(0xFF38352F),
+    outline = Color(0xFF8A8376), outlineVariant = Color(0xFF45413A),
+    error = Color(0xFFE8857A), onError = Color(0xFF3B0D07),
+)
 
 /** Tiene lo schermo acceso finché la schermata è visibile, se attivato nelle impostazioni. */
 @Composable

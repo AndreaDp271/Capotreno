@@ -1,3 +1,3 @@
-Nuova scheda Opzioni: tema chiaro/scuro, colori dinamici, schermata iniziale, frequenza di aggiornamento, blocco in verticale, schermo acceso sul treno, backup e ripristino dei dati, svuota cache.
+Nuova scheda Opzioni: tema chiaro/scuro, colori dinamici, Capotreno o Carta (minimal), schermata iniziale, frequenza di aggiornamento, blocco in verticale, schermo acceso sul treno, backup e ripristino dei dati, svuota cache.
 Cerca aggiornamenti: per chi installa da GitHub, l'app scarica e installa le nuove versioni (verificando la firma). Con F-Droid gli aggiornamenti restano a F-Droid.
 Widget: corretto un errore per cui partenze, abbonamento, biglietto e infomobilità dopo un po' venivano mostrati come widget del treno.

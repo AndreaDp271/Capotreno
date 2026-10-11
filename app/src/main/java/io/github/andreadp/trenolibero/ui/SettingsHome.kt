@@ -7,6 +7,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -104,7 +107,7 @@ fun SettingsScreen(nav: Nav) {
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     val theme by AppSettings.theme.collectAsState()
-    val dynamic by AppSettings.dynamicColor.collectAsState()
+    val palette by AppSettings.palette.collectAsState()
     var startTab by remember { mutableStateOf(AppSettings.startTab) }
     var refresh by remember { mutableStateOf(AppSettings.refresh) }
     var screenOn by remember { mutableStateOf(AppSettings.keepScreenOn) }
@@ -157,15 +160,16 @@ fun SettingsScreen(nav: Nav) {
             Group("Aspetto") {
                 Item(painterResource(R.drawable.ic_set_moon), SetColors.look, "Tema", "Chiaro, scuro o come il sistema")
                 Choice(AppSettings.Theme.entries, theme, { it.label }) { AppSettings.setTheme(it) }
-                if (Build.VERSION.SDK_INT >= 31) {
-                    Divider()
-                    Item(
-                        painterResource(R.drawable.ic_set_palette), SetColors.look, "Colori dinamici",
-                        "Usa i colori dello sfondo del telefono (Material You)",
-                        trailing = { Switch(dynamic, { AppSettings.setDynamicColor(it) }) },
-                        onClick = { AppSettings.setDynamicColor(!dynamic) },
-                    )
-                }
+                Divider()
+                Item(
+                    painterResource(R.drawable.ic_set_palette), SetColors.look, "Colori",
+                    when {
+                        palette == AppSettings.Palette.PAPER -> "Carta: minimal, fondo avorio e inchiostro"
+                        palette == AppSettings.Palette.DYNAMIC && Build.VERSION.SDK_INT >= 31 -> "Presi dallo sfondo del telefono (Material You)"
+                        else -> "Verde Capotreno"
+                    },
+                )
+                PalettePicker(palette) { AppSettings.setPalette(it) }
             }
 
             Group("Generale") {
@@ -357,12 +361,59 @@ fun SettingsScreen(nav: Nav) {
     }
 }
 
+/** Tre anteprime della tavolozza: cerchi con i colori principali e il nome. */
+@Composable
+private fun PalettePicker(selected: AppSettings.Palette, onSelect: (AppSettings.Palette) -> Unit) {
+    val ctx = LocalContext.current
+    val dark = isDarkTheme()
+    val options = buildList {
+        if (Build.VERSION.SDK_INT >= 31) {
+            val s = if (dark) androidx.compose.material3.dynamicDarkColorScheme(ctx) else androidx.compose.material3.dynamicLightColorScheme(ctx)
+            add(Triple(AppSettings.Palette.DYNAMIC, s.surface, listOf(s.primary, s.secondary, s.tertiary)))
+        }
+        add(Triple(AppSettings.Palette.CLASSIC, if (dark) Color(0xFF1B1C1A) else Color(0xFFF7F8F4), listOf(Color(0xFF0B5D3B), Color(0xFF7FD8A6), Color(0xFFFFC107))))
+        add(Triple(AppSettings.Palette.PAPER, if (dark) Color(0xFF1C1B18) else Color(0xFFF4F0E6),
+            listOf(if (dark) Color(0xFFEDE7DA) else Color(0xFF1F1D1A), Color(0xFF8C8577), Color(0xFFB0372A))))
+    }
+    // senza colori dinamici (Android < 12) la scelta "Dinamici" equivale a Capotreno
+    val current = if (selected == AppSettings.Palette.DYNAMIC && Build.VERSION.SDK_INT < 31) AppSettings.Palette.CLASSIC else selected
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        options.forEach { (p, bg, dots) ->
+            val on = p == current
+            Column(
+                Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(bg)
+                    .border(if (on) 2.dp else 1.dp, if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                    .selectable(on, role = Role.RadioButton) { onSelect(p) }
+                    .padding(vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy((-6).dp)) {
+                    dots.forEach { c -> Box(Modifier.size(22.dp).clip(CircleShape).background(c).border(1.5.dp, bg, CircleShape)) }
+                }
+                Text(
+                    p.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                    color = if (bg.luminance() > 0.5f) Color(0xFF1F1D1A) else Color(0xFFEDE7DA),
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
+    }
+}
+
 /** Intestazione con icona, nome e versione dell'app. */
 @Composable
 private fun AppCard() {
+    val palette by AppSettings.palette.collectAsState()
+    val paper = palette == AppSettings.Palette.PAPER
+    val bg = if (paper) Brush.linearGradient(listOf(Color(0xFF2B2925), Color(0xFF1F1D1A)))
+    else Brush.linearGradient(listOf(Color(0xFF0B5D3B), Color(0xFF1565C0)))
     Box(
-        Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF0B5D3B), Color(0xFF1565C0)))),
+        Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(24.dp)).background(bg),
     ) {
         Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(64.dp).clip(RoundedCornerShape(18.dp))) {

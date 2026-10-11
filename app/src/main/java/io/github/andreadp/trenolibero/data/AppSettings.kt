@@ -15,6 +15,9 @@ import java.util.zip.ZipOutputStream
 object AppSettings {
     enum class Theme(val label: String) { SYSTEM("Sistema"), LIGHT("Chiaro"), DARK("Scuro") }
 
+    /** Tavolozza: colori dello sfondo (Android 12+), verde Capotreno o carta minimal. */
+    enum class Palette(val label: String) { DYNAMIC("Dinamici"), CLASSIC("Capotreno"), PAPER("Carta") }
+
     /** Frequenza dell'aggiornamento automatico: moltiplica gli intervalli predefiniti (null = disattivato). */
     enum class Refresh(val label: String, val factor: Double?) {
         FAST("Veloce", 0.5), NORMAL("Normale", 1.0), SAVER("Risparmio", 2.0), OFF("Manuale", null)
@@ -23,8 +26,8 @@ object AppSettings {
     private lateinit var prefs: android.content.SharedPreferences
     private val _theme = MutableStateFlow(Theme.SYSTEM)
     val theme: StateFlow<Theme> = _theme
-    private val _dynamicColor = MutableStateFlow(true)
-    val dynamicColor: StateFlow<Boolean> = _dynamicColor
+    private val _palette = MutableStateFlow(Palette.DYNAMIC)
+    val palette: StateFlow<Palette> = _palette
     private val _portrait = MutableStateFlow(true)
     val portrait: StateFlow<Boolean> = _portrait
 
@@ -32,7 +35,9 @@ object AppSettings {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         _theme.value = enumOr(prefs.getString("theme", null), Theme.SYSTEM)
-        _dynamicColor.value = prefs.getBoolean("dynamic_color", true)
+        // prima della 2.4 c'era solo l'interruttore dei colori dinamici
+        val legacy = if (prefs.getBoolean("dynamic_color", true)) Palette.DYNAMIC else Palette.CLASSIC
+        _palette.value = enumOr(prefs.getString("palette", null), legacy)
         _portrait.value = prefs.getBoolean("portrait", true)
     }
 
@@ -40,7 +45,7 @@ object AppSettings {
         runCatching { enumValueOf<E>(name!!) }.getOrDefault(default)
 
     fun setTheme(t: Theme) { _theme.value = t; prefs.edit().putString("theme", t.name).apply() }
-    fun setDynamicColor(v: Boolean) { _dynamicColor.value = v; prefs.edit().putBoolean("dynamic_color", v).apply() }
+    fun setPalette(p: Palette) { _palette.value = p; prefs.edit().putString("palette", p.name).apply() }
 
     /** Blocca l'app in verticale invece di seguire la rotazione automatica del telefono. */
     fun setPortrait(v: Boolean) { _portrait.value = v; prefs.edit().putBoolean("portrait", v).apply() }
