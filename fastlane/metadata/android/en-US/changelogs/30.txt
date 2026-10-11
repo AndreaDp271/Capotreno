@@ -1,0 +1,1 @@
+Test release for the in-app updater: no changes from 2.4.0.
