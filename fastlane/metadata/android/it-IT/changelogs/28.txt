@@ -1,0 +1,1 @@
+Widget: anteprime nel selettore dei widget; la freccia per invertire l'abbonamento e il pulsante aggiorna ora ricaricano davvero i dati.

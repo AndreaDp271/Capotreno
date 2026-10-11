@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Anteprima nel selettore dei widget (Android 12+), con dati di esempio -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@drawable/widget_preview_bg">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:background="@drawable/widget_preview_header" android:backgroundTint="#FF1565C0"
+        android:paddingStart="12dp" android:paddingEnd="12dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+        <ImageView android:layout_width="18dp" android:layout_height="18dp"
+            android:src="@drawable/ic_tab_train" android:tint="#FFFFFFFF" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:orientation="vertical" android:layout_marginStart="8dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="REG 17293" android:textColor="#FFFFFFFF" android:textSize="14sp" android:textStyle="bold" android:maxLines="1" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="BELLUNO → PADOVA" android:textColor="#DDFFFFFF" android:textSize="11sp" android:maxLines="1" />
+        </LinearLayout>
+        <ImageView android:layout_width="18dp" android:layout_height="18dp"
+            android:src="@drawable/ic_widget_refresh" android:tint="#FFFFFFFF" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="12dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:text="In viaggio verso Feltre" android:textColor="@color/widget_fg" android:textSize="14sp" android:textStyle="bold" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="+4\'" android:textColor="#FFFFFFFF" android:textSize="11sp" android:textStyle="bold"
+                android:background="@drawable/widget_preview_chip" android:backgroundTint="#FFC62828"
+                android:paddingStart="6dp" android:paddingEnd="6dp" android:layout_marginEnd="4dp" />
+        </LinearLayout>
+        <ProgressBar style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="6dp"
+            android:layout_marginTop="6dp" android:max="100" android:progress="45"
+            android:progressTint="#FFFF8F00" android:progressBackgroundTint="#55FF8F00" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal"
+            android:gravity="center_vertical" android:layout_marginTop="6dp">
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Prossima fermata" android:textColor="@color/widget_muted" android:textSize="11sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="FELTRE · 11:39" android:textColor="@color/widget_fg" android:textSize="13sp" />
+            </LinearLayout>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Bin. 2" android:textColor="#FFFFD54F" android:textSize="11sp" android:textStyle="bold"
+                android:background="@drawable/widget_preview_chip" android:backgroundTint="#FF263238"
+                android:paddingStart="6dp" android:paddingEnd="6dp" android:layout_marginEnd="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

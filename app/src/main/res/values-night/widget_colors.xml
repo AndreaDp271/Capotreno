@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Colori delle anteprime dei widget nel selettore (chiaro / scuro) -->
+<resources>
+    <color name="widget_bg">#FF1C1F24</color>
+    <color name="widget_fg">#FFECEFF3</color>
+    <color name="widget_muted">#FFA3ABB5</color>
+    <color name="widget_line">#FF2E333A</color>
+</resources>

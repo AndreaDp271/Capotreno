@@ -1,0 +1,1 @@
+Widgets: previews in the widget picker; the season pass swap arrow and the refresh button now really reload the data.

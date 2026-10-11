@@ -63,9 +63,9 @@ class WidgetConfigActivity : ComponentActivity() {
             val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity).getGlanceIdBy(widgetId)
             val provider = AppWidgetManager.getInstance(this@WidgetConfigActivity).getAppWidgetInfo(widgetId)?.provider?.className.orEmpty()
             when {
-                provider.endsWith("TrainWidgetReceiver") -> TrainWidget().update(this@WidgetConfigActivity, glanceId)
-                provider.endsWith("DeparturesWidgetReceiver") -> DeparturesWidget().update(this@WidgetConfigActivity, glanceId)
-                provider.endsWith("SubscriptionWidgetReceiver") -> SubscriptionWidget().update(this@WidgetConfigActivity, glanceId)
+                provider.endsWith("TrainWidgetReceiver") -> Widgets.refresh(this@WidgetConfigActivity, glanceId, TrainWidget())
+                provider.endsWith("DeparturesWidgetReceiver") -> Widgets.refresh(this@WidgetConfigActivity, glanceId, DeparturesWidget())
+                provider.endsWith("SubscriptionWidgetReceiver") -> Widgets.refresh(this@WidgetConfigActivity, glanceId, SubscriptionWidget())
             }
             Widgets.schedule(this@WidgetConfigActivity)
             setResult(Activity.RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))

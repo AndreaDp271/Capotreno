@@ -27,7 +27,9 @@ import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
+import androidx.glance.appwidget.state.updateAppWidgetState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
@@ -162,6 +164,24 @@ private fun Divider() {
     Box(GlanceModifier.fillMaxWidth().height(1.dp).background(W.line)) {}
 }
 
+/** Contatore nello stato del widget: cambia a ogni richiesta di aggiornamento. */
+internal val TICK = androidx.datastore.preferences.core.longPreferencesKey("tick")
+
+/**
+ * Dati del widget: il primo caricamento avviene prima della composizione; ogni volta che il contatore
+ * cambia (↻, inverti, aggiornamento periodico) si ricarica, anche se la sessione Glance è ancora aperta.
+ */
+@Composable
+private fun <T> rememberWidgetData(initial: T, load: suspend () -> T): T {
+    val tick = androidx.glance.currentState(TICK) ?: 0L
+    var data by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(initial) }
+    var seen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableLongStateOf(tick) }
+    androidx.compose.runtime.LaunchedEffect(tick) {
+        if (tick != seen) { seen = tick; data = load() }
+    }
+    return data
+}
+
 private fun updatedLabel(ms: Long) = "agg. ${hhmm(ms)}"
 
 private suspend fun widgetId(ctx: Context, id: GlanceId) = GlanceAppWidgetManager(ctx).getAppWidgetId(id)
@@ -174,9 +194,13 @@ class TrainWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         Graph.init(context)
         val wid = widgetId(context, id)
-        val sel = WidgetPrefs.selection(context, wid)
-        val state = sel?.let { loadCached(context, wid) { loadTrain(it) } }
+        val initial = WidgetPrefs.selection(context, wid)?.let { loadCached(context, wid) { loadTrain(it) } }
         provideContent {
+            // ricaricato a ogni aggiornamento (↻, inverti, aggiornamento periodico), anche a sessione aperta
+            val state = rememberWidgetData(initial) {
+                WidgetPrefs.selection(context, wid)?.let { s -> loadCached(context, wid) { loadTrain(s) } }
+            }
+            val sel = WidgetPrefs.selection(context, wid)
             Card {
                 val t = state?.data
                 // nome del treno scelto, anche quando i dati non arrivano
@@ -254,9 +278,13 @@ class DeparturesWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         Graph.init(context)
         val wid = widgetId(context, id)
-        val sel = WidgetPrefs.selection(context, wid)
-        val state = sel?.let { loadCached(context, wid) { loadDepartures(it) } }
+        val initial = WidgetPrefs.selection(context, wid)?.let { loadCached(context, wid) { loadDepartures(it) } }
         provideContent {
+            // ricaricato a ogni aggiornamento (↻, inverti, aggiornamento periodico), anche a sessione aperta
+            val state = rememberWidgetData(initial) {
+                WidgetPrefs.selection(context, wid)?.let { s -> loadCached(context, wid) { loadDepartures(s) } }
+            }
+            val sel = WidgetPrefs.selection(context, wid)
             Card {
                 val d = state?.data
                 if (d == null) {
@@ -304,9 +332,13 @@ class SubscriptionWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         Graph.init(context)
         val wid = widgetId(context, id)
-        val sel = WidgetPrefs.selection(context, wid)
-        val state = sel?.let { loadCached(context, wid) { loadSubscription(context, wid, it) } }
+        val initial = WidgetPrefs.selection(context, wid)?.let { loadCached(context, wid) { loadSubscription(context, wid, it) } }
         provideContent {
+            // ricaricato a ogni aggiornamento (↻, inverti, aggiornamento periodico), anche a sessione aperta
+            val state = rememberWidgetData(initial) {
+                WidgetPrefs.selection(context, wid)?.let { s -> loadCached(context, wid) { loadSubscription(context, wid, s) } }
+            }
+            val sel = WidgetPrefs.selection(context, wid)
             Card {
                 val s = state?.data
                 val color = Color(0xFF6A1B9A)
@@ -368,9 +400,10 @@ class TicketWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         Graph.init(context)
-        val t = nextTicket()
-        val code = t?.takeIf { it.codeText.isNotEmpty() }?.let { TicketCode.render(it.codeFormat, it.codeText) }
+        fun load() = nextTicket().let { t -> t to t?.takeIf { it.codeText.isNotEmpty() }?.let { TicketCode.render(it.codeFormat, it.codeText) } }
+        val initial = load()
         provideContent {
+            val (t, code) = rememberWidgetData(initial) { load() }
             Card {
                 val color = Color(0xFF00695C)
                 if (t == null) {
@@ -424,8 +457,9 @@ class InfoWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         Graph.init(context)
         val wid = widgetId(context, id)
-        val state = loadCached(context, wid) { loadInfo() }
+        val initial = loadCached(context, wid) { loadInfo() }
         provideContent {
+            val state = rememberWidgetData(initial) { loadCached(context, wid) { loadInfo() } }
             Card {
                 val d = state.data
                 val color = Color(0xFFE65100)
@@ -471,7 +505,7 @@ class SwapAction : ActionCallback {
 
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         WidgetPrefs.setReversed(context, parameters[WIDGET] ?: return, parameters[REVERSE] ?: return)
-        SubscriptionWidget().update(context, glanceId)
+        Widgets.refresh(context, glanceId, SubscriptionWidget())
     }
 }
 
@@ -486,13 +520,18 @@ object Widgets {
         return receivers.any { m.getAppWidgetIds(ComponentName(ctx, it)).isNotEmpty() }
     }
 
+    /** Chiede al widget di ricaricare i dati: cambia il contatore nel suo stato e lo ridisegna. */
+    suspend fun refresh(ctx: Context, id: GlanceId, widget: GlanceAppWidget) {
+        updateAppWidgetState(ctx, id) { it[TICK] = System.currentTimeMillis() }
+        widget.update(ctx, id)
+    }
+
     suspend fun updateAll(ctx: Context) {
         Graph.init(ctx)
-        TrainWidget().updateAll(ctx)
-        DeparturesWidget().updateAll(ctx)
-        SubscriptionWidget().updateAll(ctx)
-        TicketWidget().updateAll(ctx)
-        InfoWidget().updateAll(ctx)
+        val manager = GlanceAppWidgetManager(ctx)
+        listOf(TrainWidget(), DeparturesWidget(), SubscriptionWidget(), TicketWidget(), InfoWidget()).forEach { w ->
+            manager.getGlanceIds(w.javaClass).forEach { id -> runCatching { refresh(ctx, id, w) } }
+        }
     }
 
     /** Aggiornamento ogni 15 minuti (minimo consentito da Android) finché c'è almeno un widget. */
