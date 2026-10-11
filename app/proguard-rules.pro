@@ -16,3 +16,6 @@
 -dontwarn com.gemalto.jp2.JP2Encoder
 -keep class com.tom_roush.pdfbox.** { *; }
 -keep class com.tom_roush.fontbox.** { *; }
+
+# Widget Glance: le azioni sono istanziate per nome di classe
+-keep class * implements androidx.glance.appwidget.action.ActionCallback { <init>(); }

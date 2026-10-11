@@ -146,6 +146,9 @@ fun SettingsScreen(nav: Nav) {
                 onValueChangeFinished = { settings.reminderMinutes = reminder.toInt() },
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            SectionTitle("Widget per la schermata home")
+            WidgetButtons()
             Text(
                 "I controlli avvengono sul telefono circa ogni 15 minuti, solo con connessione e solo se hai attivato " +
                     "almeno una notifica (nessun server esterno). Android può ritardarli in risparmio energetico.\n\n" +
@@ -153,6 +156,41 @@ fun SettingsScreen(nav: Nav) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),
+            )
+        }
+    }
+}
+
+/** Propone al launcher di aggiungere un widget (Android 8+, se il launcher lo supporta). */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun WidgetButtons() {
+    val ctx = LocalContext.current
+    val manager = android.appwidget.AppWidgetManager.getInstance(ctx)
+    val canPin = Build.VERSION.SDK_INT >= 26 && manager.isRequestPinAppWidgetSupported
+    val widgets = listOf(
+        "Treno" to io.github.andreadp.trenolibero.widget.TrainWidgetReceiver::class.java,
+        "Partenze" to io.github.andreadp.trenolibero.widget.DeparturesWidgetReceiver::class.java,
+        "Abbonamento" to io.github.andreadp.trenolibero.widget.SubscriptionWidgetReceiver::class.java,
+        "Biglietto" to io.github.andreadp.trenolibero.widget.TicketWidgetReceiver::class.java,
+        "Infomobilità" to io.github.andreadp.trenolibero.widget.InfoWidgetReceiver::class.java,
+    )
+    if (!canPin) {
+        Text(
+            "Tieni premuto su uno spazio vuoto della schermata home, scegli Widget e cerca Capotreno.",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        return
+    }
+    androidx.compose.foundation.layout.FlowRow(
+        Modifier.padding(horizontal = 16.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+    ) {
+        widgets.forEach { (label, cls) ->
+            androidx.compose.material3.AssistChip(
+                onClick = { manager.requestPinAppWidget(android.content.ComponentName(ctx, cls), null, null) },
+                label = { Text("+ $label") },
             )
         }
     }

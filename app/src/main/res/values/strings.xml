@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Capotreno</string>
+    <string name="widget_train_desc">Stato di un treno: ritardo, prossima fermata, binario e avanzamento</string>
+    <string name="widget_departures_desc">Prossime partenze da una stazione</string>
+    <string name="widget_subscription_desc">Prossimi treni compatibili con il tuo abbonamento</string>
+    <string name="widget_ticket_desc">Il prossimo biglietto con il codice per il controllore</string>
+    <string name="widget_info_desc">Scioperi e disagi alla circolazione</string>
 </resources>

@@ -1,0 +1,1 @@
+Home screen widgets: train, station departures, season pass, next ticket with its code, infomobility. They refresh by themselves and can also be added from settings.

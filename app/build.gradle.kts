@@ -22,8 +22,8 @@ android {
         applicationId = "io.github.andreadp271.capotreno"
         minSdk = 24
         targetSdk = 35
-        versionCode = 25
-        versionName = "2.2.2"
+        versionCode = 26
+        versionName = "2.3.0"
     }
 
     signingConfigs {
@@ -90,6 +90,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.4.0")
     implementation("androidx.camera:camera-view:1.4.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation("androidx.glance:glance-appwidget:1.1.1")
 
     testImplementation("junit:junit:4.13.2")
 }

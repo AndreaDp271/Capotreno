@@ -46,5 +46,71 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
+
+        <!-- Widget della schermata home (Jetpack Glance) -->
+        <activity
+            android:name=".widget.WidgetConfigActivity"
+            android:exported="true"
+            android:label="Configura widget"
+            android:theme="@style/Theme.Capotreno">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+        <receiver
+            android:name=".widget.TrainWidgetReceiver"
+            android:exported="true"
+            android:label="Treno">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_train" />
+        </receiver>
+        <receiver
+            android:name=".widget.DeparturesWidgetReceiver"
+            android:exported="true"
+            android:label="Partenze">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_departures" />
+        </receiver>
+        <receiver
+            android:name=".widget.SubscriptionWidgetReceiver"
+            android:exported="true"
+            android:label="Abbonamento">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_subscription" />
+        </receiver>
+        <receiver
+            android:name=".widget.TicketWidgetReceiver"
+            android:exported="true"
+            android:label="Biglietto">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_ticket" />
+        </receiver>
+        <receiver
+            android:name=".widget.InfoWidgetReceiver"
+            android:exported="true"
+            android:label="Infomobilità">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
     </application>
 </manifest>

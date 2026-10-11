@@ -1,0 +1,1 @@
+Widget per la schermata home: treno, partenze da una stazione, abbonamento, prossimo biglietto con il codice, infomobilità. Si aggiornano da soli e si aggiungono anche dalle impostazioni.
