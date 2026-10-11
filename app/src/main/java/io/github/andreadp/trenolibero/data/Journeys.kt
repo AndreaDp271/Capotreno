@@ -20,6 +20,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -133,9 +134,13 @@ object JourneySearch {
     }
 
     suspend fun search(from: StationRef, to: StationRef, time: Date): List<Journey> = coroutineScope {
-        val tren = async { runCatching { trenitalia(from, to, time) }.getOrDefault(emptyList()) }
+        val tren = async { runCatching { trenitalia(from, to, time) } }
         val direct = async { runCatching { directFromBoards(from, to, time) }.getOrDefault(emptyList()) }
-        merge(tren.await(), direct.await())
+        val t = tren.await()
+        val out = merge(t.getOrDefault(emptyList()), direct.await())
+        // senza risultati, l'errore di LeFrecce spiega il perché (per i giorni futuri è l'unica fonte)
+        t.exceptionOrNull()?.let { e -> if (out.isEmpty()) throw IOException("Il servizio Trenitalia non risponde: ${e.message ?: e.javaClass.simpleName}") }
+        out
     }
 
     private fun merge(trenitalia: List<Journey>, direct: List<Journey>): List<Journey> {
@@ -171,7 +176,10 @@ object JourneySearch {
                 .header("Accept", "application/json")
                 .post(body.toRequestBody("application/json".toMediaType()))
                 .build()
-            val text = client.newCall(req).execute().use { r -> if (r.isSuccessful) r.body?.string() else null } ?: return@flatMap emptyList()
+            val text = client.newCall(req).execute().use { r ->
+                if (!r.isSuccessful) { if (page == 0) throw IOException("errore ${r.code}") else return@flatMap emptyList() }
+                r.body?.string()
+            } ?: return@flatMap emptyList()
             val root = ViaggiaTrenoApi.json.parseToJsonElement(text) as? JsonObject ?: return@flatMap emptyList()
             (root["solutions"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { el ->
                 val sol = (el as? JsonObject)?.get("solution") as? JsonObject ?: return@mapNotNull null
