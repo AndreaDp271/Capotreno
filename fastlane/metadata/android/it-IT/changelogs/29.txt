@@ -1,0 +1,1 @@
+Widget: corretto un errore per cui i widget di partenze, abbonamento, biglietto e infomobilità dopo un po' venivano mostrati come widget del treno.

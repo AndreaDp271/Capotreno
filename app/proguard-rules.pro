@@ -19,3 +19,7 @@
 
 # Widget Glance: le azioni sono istanziate per nome di classe
 -keep class * implements androidx.glance.appwidget.action.ActionCallback { <init>(); }
+
+# Ogni widget deve restare una classe distinta: Glance cerca i widget per classe
+# (getGlanceIds) e R8 altrimenti fonde le sottoclassi simili in una sola.
+-keep class * extends androidx.glance.appwidget.GlanceAppWidget { <init>(); }

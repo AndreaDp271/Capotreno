@@ -1,0 +1,1 @@
+Widgets: fixed departures, season pass, ticket and travel info widgets turning into train widgets after a while.
