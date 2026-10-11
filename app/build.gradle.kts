@@ -22,8 +22,8 @@ android {
         applicationId = "io.github.andreadp271.capotreno"
         minSdk = 24
         targetSdk = 35
-        versionCode = 26
-        versionName = "2.3.0"
+        versionCode = 27
+        versionName = "2.3.1"
     }
 
     signingConfigs {

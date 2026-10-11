@@ -149,6 +149,7 @@ fun SettingsScreen(nav: Nav) {
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SectionTitle("Widget per la schermata home")
             WidgetButtons()
+            BackgroundHint()
             Text(
                 "I controlli avvengono sul telefono circa ogni 15 minuti, solo con connessione e solo se hai attivato " +
                     "almeno una notifica (nessun server esterno). Android può ritardarli in risparmio energetico.\n\n" +
@@ -157,6 +158,36 @@ fun SettingsScreen(nav: Nav) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),
             )
+        }
+    }
+}
+
+/**
+ * Su molti telefoni (ColorOS, MIUI, One UI…) il risparmio energetico blocca l'app in background:
+ * widget e notifiche smettono di aggiornarsi finché non si consente l'attività in background.
+ */
+@Composable
+private fun BackgroundHint() {
+    val ctx = LocalContext.current
+    val pm = ctx.getSystemService(android.os.PowerManager::class.java)
+    val restricted = !pm.isIgnoringBatteryOptimizations(ctx.packageName)
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(
+            if (restricted) "Il risparmio energetico può fermare l'aggiornamento di widget e notifiche. " +
+                "Apri le impostazioni dell'app → Batteria e consenti l'attività in background (nessuna restrizione)."
+            else "Attività in background consentita: widget e notifiche si aggiornano regolarmente.",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (restricted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (restricted) {
+            androidx.compose.material3.TextButton(onClick = {
+                ctx.startActivity(
+                    android.content.Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.fromParts("package", ctx.packageName, null),
+                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }) { Text("Apri impostazioni batteria dell'app") }
         }
     }
 }

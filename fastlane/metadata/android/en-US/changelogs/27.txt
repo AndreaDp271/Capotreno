@@ -1,0 +1,1 @@
+More reliable widgets: the train widget shows the train name and the reason when there is no data (for example if it does not run today), retries when the network fails and no longer shows hours-old data. Settings: notice and shortcut to allow background activity.

@@ -1,0 +1,1 @@
+Widget più affidabili: il widget Treno mostra il nome del treno e il motivo quando non ci sono dati (per esempio se oggi non circola), riprova da solo se la rete fallisce e non mostra più dati vecchi di ore. Nelle impostazioni, avviso e scorciatoia per consentire l'attività in background.

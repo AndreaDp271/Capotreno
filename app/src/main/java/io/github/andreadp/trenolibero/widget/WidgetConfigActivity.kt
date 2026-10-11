@@ -111,7 +111,7 @@ private fun TrainPicker(onPick: (String) -> Unit) {
                 ListItem(
                     headlineContent = { Text(t.label) },
                     supportingContent = { Text("Il treno di oggi, ogni giorno") },
-                    modifier = Modifier.clickable { onPick("${t.number}|${t.originId}|") },
+                    modifier = Modifier.clickable { onPick("${t.number}|${t.originId}||${t.label}") },
                 )
                 HorizontalDivider()
             }
@@ -120,7 +120,7 @@ private fun TrainPicker(onPick: (String) -> Unit) {
                 ListItem(
                     headlineContent = { Text("${tr.category} ${tr.number}".trim()) },
                     supportingContent = { Text("${t.title} · ${t.date} ${t.departure}") },
-                    modifier = Modifier.clickable { onPick("${tr.number}||${date ?: ""}") },
+                    modifier = Modifier.clickable { onPick("${tr.number}||${date ?: ""}|${"${tr.category} ${tr.number}".trim()} · ${t.title}") },
                 )
                 HorizontalDivider()
             }

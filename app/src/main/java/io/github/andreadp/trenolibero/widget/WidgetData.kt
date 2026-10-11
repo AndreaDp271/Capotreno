@@ -40,16 +40,41 @@ object WidgetPrefs {
 /** Esito del caricamento: dati freschi, dati vecchi (rete assente) o niente da mostrare. */
 data class WidgetState<T>(val data: T?, val stale: Boolean, val message: String? = null)
 
-/** Carica i dati, salva la copia locale; se la rete non risponde usa l'ultima copia. */
-internal suspend inline fun <reified T> loadCached(ctx: Context, id: Int, crossinline fetch: suspend () -> T): WidgetState<T> =
-    try {
-        val d = fetch()
-        WidgetPrefs.setCache(ctx, id, ViaggiaTrenoApi.json.encodeToString(d))
-        WidgetState(d, stale = false)
-    } catch (e: Exception) {
-        val cached = WidgetPrefs.cache(ctx, id)?.let { runCatching { ViaggiaTrenoApi.json.decodeFromString<T>(it) }.getOrNull() }
-        WidgetState(cached, stale = true, message = if (cached == null) "Dati non disponibili" else null)
+/** Carica i dati (con un secondo tentativo se la rete fallisce) e salva la copia locale;
+ *  se la rete non risponde usa l'ultima copia, purché recente. */
+internal suspend inline fun <reified T> loadCached(ctx: Context, id: Int, crossinline fetch: suspend () -> T): WidgetState<T> {
+    var error: Exception? = null
+    repeat(2) { attempt ->
+        try {
+            val d = fetch()
+            WidgetPrefs.setCache(ctx, id, ViaggiaTrenoApi.json.encodeToString(d))
+            return WidgetState(d, stale = false)
+        } catch (e: Exception) {
+            error = e
+            if (attempt == 0) kotlinx.coroutines.delay(2_000)
+        }
     }
+    // la copia locale vale solo per poche ore: un treno di ieri non va mostrato come attuale
+    val cached = WidgetPrefs.cache(ctx, id)?.let { runCatching { ViaggiaTrenoApi.json.decodeFromString<T>(it) }.getOrNull() }
+        ?.takeIf { cachedAge(it) < 6 * 3600_000L }
+    val msg = when (error) {
+        is java.net.UnknownHostException, is java.net.SocketTimeoutException, is java.net.ConnectException -> "Nessuna connessione: tocca ↻ per riprovare"
+        else -> error?.message?.takeIf { it.isNotBlank() } ?: "Dati non disponibili: tocca ↻ per riprovare"
+    }
+    return WidgetState(cached, stale = true, message = if (cached == null) msg else null)
+}
+
+/** Età della copia locale (ms), dal campo updatedAt dei modelli. */
+fun cachedAge(d: Any?): Long {
+    val at = when (d) {
+        is TrainW -> d.updatedAt
+        is DeparturesW -> d.updatedAt
+        is SubscriptionW -> d.updatedAt
+        is InfoW -> d.updatedAt
+        else -> return 0
+    }
+    return System.currentTimeMillis() - at
+}
 
 private val hm get() = SimpleDateFormat("HH:mm", Locale.ITALY).apply { timeZone = ViaggiaTrenoApi.ROME }
 fun hhmm(ms: Long?): String = ms?.let { hm.format(Date(it)) } ?: "--:--"
@@ -61,7 +86,7 @@ data class TrainW(
     val title: String,
     val route: String,
     val status: String,
-    /** "running", "standing", "waiting", "arrived", "cancelled" */
+    /** "running", "standing", "waiting", "arrived", "cancelled", "unavailable" */
     val phase: String,
     val delay: Int? = null,
     val nextStop: String? = null,
@@ -75,10 +100,38 @@ data class TrainW(
     val updatedAt: Long,
 )
 
-/** Selezione "numero|origine|data" (origine e data facoltative: si usa il treno di oggi). */
+/** Selezione "numero|origine|data|etichetta" (origine e data facoltative: si usa il treno di oggi). */
 suspend fun loadTrain(selection: String): TrainW {
-    val (num, origin, date) = (selection.split("|") + listOf("", "")).take(3)
-    val (m, a) = resolveTrainData(num, origin.ifEmpty { null }, date.toLongOrNull())
+    val (num, origin, date, label) = (selection.split("|", limit = 4) + listOf("", "", "")).take(4)
+    val dateMs = date.toLongOrNull()
+    fun unavailable(why: String) = TrainW(
+        title = label.ifBlank { "Treno $num" }.let { if (it.length > 40) it.take(40) + "…" else it },
+        route = "", status = why, phase = "unavailable",
+        number = num, originId = origin, dateMs = dateMs ?: 0, updatedAt = System.currentTimeMillis(),
+    )
+    // ViaggiaTreno conosce solo le corse di oggi: un treno che oggi non viaggia non compare
+    val match = if (origin.isNotEmpty() && dateMs != null) {
+        io.github.andreadp.trenolibero.data.TrainMatch("", num, origin, dateMs)
+    } else {
+        val found = ViaggiaTrenoApi.searchTrain(num)
+        val m = found.firstOrNull { it.originId == origin } ?: found.firstOrNull()
+            ?: return unavailable("Oggi il treno $num non circola")
+        if (dateMs != null) m.copy(dateMs = dateMs) else m
+    }
+    val a = ViaggiaTrenoApi.trainStatus(match.originId, match.number, match.dateMs) ?: run {
+        val today = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val day = SimpleDateFormat("dd/MM", Locale.ITALY).apply { timeZone = ViaggiaTrenoApi.ROME }.format(Date(match.dateMs))
+        return unavailable(
+            when {
+                dateMs != null && dateMs > today -> "Viaggio del $day: i dati arrivano il giorno stesso"
+                dateMs != null && dateMs < today -> "Viaggio del $day concluso"
+                else -> "Oggi il treno $num non circola"
+            },
+        )
+    }
+    val m = match
     val stops = a.fermate
     val lastReached = stops.indexOfLast { it.reached && !it.suppressed }
     val next = if (a.cancelled || a.arrivato == true) -1

@@ -179,9 +179,16 @@ class TrainWidget : GlanceAppWidget() {
         provideContent {
             Card {
                 val t = state?.data
+                // nome del treno scelto, anche quando i dati non arrivano
+                val selTitle = sel?.split("|", limit = 4)?.let { p -> p.getOrNull(3)?.takeIf { it.isNotBlank() } ?: "Treno ${p[0]}" } ?: "Treno"
                 if (t == null) {
-                    Header(W.passed, R.drawable.ic_tab_train, "Treno", null, false)
+                    Header(Color(0xFF455A64), R.drawable.ic_tab_train, selTitle, null, false)
                     Empty(if (sel == null) "Tieni premuto il widget per scegliere un treno" else state?.message ?: "Caricamento…")
+                    return@Card
+                }
+                if (t.phase == "unavailable") {
+                    Header(Color(0xFF455A64), R.drawable.ic_tab_train, t.title, "agg. ${hhmm(t.updatedAt)}", state.stale)
+                    Empty(t.status)
                     return@Card
                 }
                 val color = when (t.phase) {
@@ -492,8 +499,10 @@ object Widgets {
     fun schedule(ctx: Context) {
         if (!any(ctx)) return
         WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
-            "widgets", ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<WidgetWorker>(15, TimeUnit.MINUTES).build(),
+            "widgets", ExistingPeriodicWorkPolicy.UPDATE,
+            PeriodicWorkRequestBuilder<WidgetWorker>(15, TimeUnit.MINUTES)
+                .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
+                .build(),
         )
     }
 }
