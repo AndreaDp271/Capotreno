@@ -1,0 +1,1 @@
+Tabellone della stazione: ora si può scegliere anche il giorno (da oggi fino a 60 giorni), oltre all'ora.

@@ -1,0 +1,1 @@
+Station board: you can now pick the day (today up to 60 days ahead) as well as the time.
