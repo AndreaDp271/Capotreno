@@ -10,7 +10,7 @@ import java.util.Date
 class LiveJourneyTest {
     private fun show(from: StationRef, to: StationRef) = runBlocking {
         val t = System.currentTimeMillis()
-        val res = JourneySearch.search(from, to, Date())
+        val res = JourneySearch.search(from, to, Date()).journeys
         println("${from.name} -> ${to.name}: ${res.size} soluzioni in ${System.currentTimeMillis() - t} ms")
         res.take(10).forEach { j ->
             println("   ${io.github.andreadp.trenolibero.ui.fmtTime(j.departure)}-${io.github.andreadp.trenolibero.ui.fmtTime(j.arrival)} " +
