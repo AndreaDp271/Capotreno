@@ -1,0 +1,3 @@
+Journey search: for dates beyond the timetable change, when regional trains are not on sale yet, it suggests Frecce and Intercity from nearby main stations; Trenitalia errors are shown clearly.
+Updates: work even when GitHub rate-limits requests.
+Board and search: the chosen day is kept even if the time picker is closed; no past dates.

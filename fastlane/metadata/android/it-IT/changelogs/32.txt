@@ -1,0 +1,3 @@
+Cerca viaggio: per le date oltre il cambio orario, quando i regionali non sono ancora in vendita, propone Frecce e Intercity dalle stazioni principali vicine; errori di Trenitalia mostrati in chiaro.
+Aggiornamenti: funzionano anche quando GitHub limita le richieste.
+Tabellone e ricerca: il giorno scelto resta valido anche chiudendo l'orologio; niente date passate.

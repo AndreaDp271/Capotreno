@@ -133,14 +133,70 @@ object JourneySearch {
         runCatching { SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US).parse(it)?.time }.getOrNull()
     }
 
-    suspend fun search(from: StationRef, to: StationRef, time: Date): List<Journey> = coroutineScope {
+    /** Risultato della ricerca: [notice] spiega quando le soluzioni partono o arrivano in una stazione diversa. */
+    data class Result(val journeys: List<Journey>, val notice: String? = null)
+
+    suspend fun search(from: StationRef, to: StationRef, time: Date): Result = coroutineScope {
         val tren = async { runCatching { trenitalia(from, to, time) } }
         val direct = async { runCatching { directFromBoards(from, to, time) }.getOrDefault(emptyList()) }
         val t = tren.await()
         val out = merge(t.getOrDefault(emptyList()), direct.await())
-        // senza risultati, l'errore di LeFrecce spiega il perché (per i giorni futuri è l'unica fonte)
-        t.exceptionOrNull()?.let { e -> if (out.isEmpty()) throw e }
-        out
+        val e = t.exceptionOrNull()
+        when {
+            out.isNotEmpty() || e == null -> Result(out)
+            // oltre il cambio orario i regionali non sono in vendita: si cercano le Frecce dalle stazioni principali vicine
+            e is NotOnSale -> viaHubs(from, to, time) ?: throw e
+            // senza risultati, l'errore di LeFrecce spiega il perché (per i giorni futuri è l'unica fonte)
+            else -> throw e
+        }
+    }
+
+    /** Errore di LeFrecce per le date in cui i treni non sono (ancora) in vendita. */
+    class NotOnSale(message: String) : IOException(message)
+
+    /** Stazioni servite da Frecce e Intercity, in vendita con mesi di anticipo. */
+    private val hubs = listOf(
+        "S01700", "S01820", "S00219", "S00035", "S01717", "S02430", "S02446", "S02581", "S02589", "S02593", "S02712",
+        "S03026", "S02701", "S03317", "S02038", "S02026", "S01529", "S00248", "S00470", "S04700", "S06000", "S06500",
+        "S06725", "S05043", "S05032", "S05254", "S05014", "S05712", "S05706", "S05071", "S07113", "S06421", "S06915",
+        "S07004", "S08409", "S08217", "S09218", "S09988", "S09211", "S09818", "S11100", "S11119", "S11145", "S11465", "S11781",
+    )
+
+    /** Fino a tre stazioni principali entro 100 km da [s] (o [s] stessa, se lo è). */
+    private suspend fun nearestHubs(s: StationRef): List<Pair<StationRef, Double>> {
+        if (s.id in hubs) return listOf(s to 0.0)
+        val me = Graph.stations.get(s.id) ?: return emptyList()
+        return hubs.mapNotNull { id -> Graph.stations.get(id) }
+            .map { h -> StationRef(h.codiceStazione, h.name) to DetectionLocator.distanceKm(me.lat, me.lon, h.lat, h.lon) }
+            .filter { it.second <= 100.0 }
+            .sortedBy { it.second }
+            .take(3)
+    }
+
+    /** Cerca in parallelo tra le stazioni principali vicine a partenza e arrivo e unisce le soluzioni. */
+    private suspend fun viaHubs(from: StationRef, to: StationRef, time: Date): Result? = coroutineScope {
+        val pairs = nearestHubs(from).flatMap { a -> nearestHubs(to).map { b -> Triple(a.first, b.first, a.second + b.second) } }
+            .filter { (a, b, _) -> a.id != b.id && (a.id != from.id || b.id != to.id) }
+            .sortedBy { it.third }
+            .take(5)
+        val found = pairs.map { (a, b, _) -> async { Triple(a, b, runCatching { trenitalia(a, b, time) }.getOrNull().orEmpty()) } }
+            .awaitAll().filter { it.third.isNotEmpty() }
+        if (found.isEmpty()) return@coroutineScope null
+        // LeFrecce a volte propone anche treni prima dell'ora chiesta: si tengono solo i successivi, se ce ne sono
+        val all = found.flatMap { it.third }.distinctBy { j -> j.legs.joinToString { it.number } + j.departure }.sortedBy { it.departure }
+        val journeys = all.filter { it.departure >= time.time - 60_000 }.ifEmpty { all }
+        val starts = found.map { it.first }.distinctBy { it.id }.filter { it.id != from.id }
+        val ends = found.map { it.second }.distinctBy { it.id }.filter { it.id != to.id }
+        fun names(l: List<StationRef>) = l.joinToString(", ") { it.name }
+        val parts = buildList {
+            if (starts.isNotEmpty()) add("da ${from.name} a ${names(starts)}")
+            if (ends.isNotEmpty()) add("da ${names(ends)} a ${to.name}")
+        }.joinToString(" e ")
+        Result(
+            journeys,
+            "I treni regionali per questa data non sono ancora in vendita (Trenitalia li vende fino al prossimo cambio orario). " +
+                "Ecco Frecce e Intercity dalle stazioni principali vicine: il tratto $parts si potrà cercare più avanti.",
+        )
     }
 
     private fun merge(trenitalia: List<Journey>, direct: List<Journey>): List<Journey> {
@@ -164,12 +220,12 @@ object JourneySearch {
         }.getOrNull().orEmpty()
         if ("no travel solutions" in msg.lowercase()) {
             val far = time.time - System.currentTimeMillis() > 30L * 24 * 3600_000
-            return IOException(
-                if (far) "Nessuna soluzione in vendita per questa data. Trenitalia vende i treni regionali solo fino al " +
+            if (far) return NotOnSale(
+                "Nessuna soluzione in vendita per questa data. Trenitalia vende i treni regionali solo fino al " +
                     "prossimo cambio orario (metà dicembre o metà giugno); Frecce e Intercity anche con mesi di anticipo. " +
                     "Riprova più avanti o scegli una data più vicina."
-                else "Nessuna soluzione trovata per questa data e quest'ora"
             )
+            return IOException("Nessuna soluzione trovata per questa data e quest'ora")
         }
         return IOException("Il servizio Trenitalia non risponde (errore $code)" + if (msg.isNotBlank()) ": $msg" else "")
     }

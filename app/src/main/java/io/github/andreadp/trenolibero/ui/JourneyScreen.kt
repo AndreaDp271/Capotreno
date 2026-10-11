@@ -82,6 +82,7 @@ import java.util.Locale
 /** Ultima ricerca, conservata finché l'app resta aperta. */
 private object JourneyCache {
     var results: List<Journey>? = null
+    var notice: String? = null
     var error: String? = null
 }
 
@@ -95,6 +96,7 @@ fun JourneyScreen(nav: Nav) {
     // risultati conservati per la sessione: tornando indietro da un treno la lista resta
     var results by remember { mutableStateOf(JourneyCache.results) }
     var error by remember { mutableStateOf(JourneyCache.error) }
+    var notice by remember { mutableStateOf(JourneyCache.notice) }
     var loading by remember { mutableStateOf(false) }
     var kinds by rememberSaveable { mutableStateOf(TrainKind.entries.map { it.name }.toSet()) }
     var directOnly by rememberSaveable { mutableStateOf(false) }
@@ -109,13 +111,17 @@ fun JourneyScreen(nav: Nav) {
         val a = ref(from) ?: return
         val b = ref(to) ?: return
         scope.launch {
-            loading = true; error = null
+            loading = true; error = null; notice = null
             try {
-                results = JourneySearch.search(a, b, Date(timeMs ?: System.currentTimeMillis()))
-                if (results!!.isEmpty()) error = "Nessuna soluzione trovata"
+                val r = JourneySearch.search(a, b, Date(timeMs ?: System.currentTimeMillis()))
+                results = r.journeys
+                notice = r.notice
+                if (r.journeys.isEmpty()) error = "Nessuna soluzione trovata"
             } catch (e: Exception) {
+                results = null
                 error = errorMessage(e)
             }
+            JourneyCache.notice = notice
             JourneyCache.results = results
             JourneyCache.error = error
             loading = false
@@ -209,6 +215,22 @@ fun JourneyScreen(nav: Nav) {
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
+                }
+            }
+            notice?.let { n ->
+                item {
+                    androidx.compose.material3.Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text(
+                            n,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    }
                 }
             }
             error?.let { item { EmptyText(it) } }
