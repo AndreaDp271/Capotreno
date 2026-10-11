@@ -73,6 +73,13 @@ class Nav(private val c: NavHostController) {
     fun widgetSettings() = c.navigate("settings/widgets")
 }
 
+/** Passa a una scheda della barra conservando lo stato delle altre schede. */
+private fun NavHostController.switchTab(route: String) = navigate(route) {
+    popUpTo(graph.findStartDestination().id) { saveState = true }
+    launchSingleTop = true
+    restoreState = true
+}
+
 /** Voce della barra: icona Material o disegno vettoriale dell'app. */
 private data class Tab(val route: String, val label: String, val icon: ImageVector? = null, val drawable: Int = 0)
 
@@ -107,7 +114,9 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}, pendingRou
     UpdateDialog()
     LaunchedEffect(pendingRoute) {
         val r = pendingRoute ?: return@LaunchedEffect
-        runCatching { controller.navigate(r) }
+        // una scheda principale (es. Info da una notifica) si apre come dalla barra, non sopra la scheda iniziale:
+        // altrimenti toccando quella scheda si ripristinerebbe la pila salvata e si tornerebbe qui
+        runCatching { if (tabs.any { it.route == r }) controller.switchTab(r) else controller.navigate(r) }
         onRouteHandled()
     }
     importError?.let { msg ->
@@ -129,13 +138,7 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}, pendingRou
                 tabs.forEach { t ->
                     NavigationBarItem(
                         selected = route == t.route,
-                        onClick = {
-                            controller.navigate(t.route) {
-                                popUpTo(controller.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onClick = { controller.switchTab(t.route) },
                         icon = {
                             if (t.icon != null) Icon(t.icon, null) else Icon(painterResource(t.drawable), null)
                         },
