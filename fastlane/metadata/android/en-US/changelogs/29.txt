@@ -1,1 +1,2 @@
+New Settings screen: light/dark theme, dynamic colors, start screen, refresh rate, keep screen on while following a train, data backup and restore, clear cache.
 Widgets: fixed departures, season pass, ticket and travel info widgets turning into train widgets after a while.

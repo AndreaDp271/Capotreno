@@ -360,7 +360,7 @@ private fun FullscreenPage(b: Bitmap, onClose: () -> Unit) {
     DisposableEffect(Unit) {
         val w = activity?.window
         val old = w?.attributes?.screenBrightness
-        w?.attributes = w?.attributes?.apply { screenBrightness = 1f }
+        if (io.github.andreadp.trenolibero.data.AppSettings.qrBrightness) w?.attributes = w?.attributes?.apply { screenBrightness = 1f }
         onDispose { w?.attributes = w?.attributes?.apply { screenBrightness = old ?: -1f } }
     }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {

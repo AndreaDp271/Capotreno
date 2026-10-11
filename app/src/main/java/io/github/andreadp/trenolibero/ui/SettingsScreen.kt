@@ -37,7 +37,7 @@ import io.github.andreadp.trenolibero.data.NotifySettings
 /** Impostazioni delle notifiche. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(nav: Nav) {
+fun NotificationSettingsScreen(nav: Nav) {
     val ctx = LocalContext.current
     val settings = remember { NotifySettings(ctx) }
     var favorites by remember { mutableStateOf(settings.favorites) }
@@ -147,13 +147,43 @@ fun SettingsScreen(nav: Nav) {
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            SectionTitle("Widget per la schermata home")
-            WidgetButtons()
             BackgroundHint()
             Text(
                 "I controlli avvengono sul telefono circa ogni 15 minuti, solo con connessione e solo se hai attivato " +
                     "almeno una notifica (nessun server esterno). Android può ritardarli in risparmio energetico.\n\n" +
                     "La sveglia prima della fermata si imposta dalla schermata del treno (icona della campanella).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+    }
+}
+
+/** Widget per la schermata home: aggiunta rapida e consigli per l'aggiornamento in background. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WidgetSettingsScreen(nav: Nav) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Widget") },
+                navigationIcon = { IconButton(onClick = { nav.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro") } },
+            )
+        },
+    ) { pad ->
+        Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState())) {
+            Text(
+                "Aggiungi un widget alla schermata home: treno seguito, partenze di una stazione, prossimi treni " +
+                    "dell'abbonamento, prossimo biglietto con codice QR e avvisi di Infomobilità.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(16.dp),
+            )
+            WidgetButtons()
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            BackgroundHint()
+            Text(
+                "I widget si aggiornano circa ogni 15 minuti, uscendo dall'app e toccando il pulsante di aggiornamento.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -66,6 +67,10 @@ class Nav(private val c: NavHostController) {
     fun journey() = c.navigate("journey")
 
     fun settings() = c.navigate("settings")
+
+    fun notificationSettings() = c.navigate("settings/notifications")
+
+    fun widgetSettings() = c.navigate("settings/widgets")
 }
 
 /** Voce della barra: icona Material o disegno vettoriale dell'app. */
@@ -77,6 +82,7 @@ private val tabs = listOf(
     Tab("map", "Mappa", Icons.Default.Place),
     Tab("tickets", "Biglietti", drawable = R.drawable.ic_tab_ticket),
     Tab("info", "Info", Icons.Default.Info),
+    Tab("settings", "Opzioni", Icons.Default.Settings),
 )
 
 /**
@@ -85,6 +91,9 @@ private val tabs = listOf(
 @Composable
 fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}, pendingRoute: String? = null, onRouteHandled: () -> Unit = {}) {
     val controller = rememberNavController()
+    val startTab = remember {
+        io.github.andreadp.trenolibero.data.AppSettings.startTab.takeIf { s -> tabs.any { it.route == s } } ?: "home"
+    }
     val nav = remember(controller) { Nav(controller) }
     var importError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(pendingImport) {
@@ -126,13 +135,13 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}, pendingRou
                         icon = {
                             if (t.icon != null) Icon(t.icon, null) else Icon(painterResource(t.drawable), null)
                         },
-                        label = { Text(t.label) },
+                        label = { Text(t.label, maxLines = 1, softWrap = false) },
                     )
                 }
             }
         },
     ) { pad ->
-        NavHost(controller, startDestination = "home", modifier = Modifier.padding(pad).consumeWindowInsets(pad).fillMaxSize()) {
+        NavHost(controller, startDestination = startTab, modifier = Modifier.padding(pad).consumeWindowInsets(pad).fillMaxSize()) {
             composable("home") { TrainSearchScreen(nav) }
             composable("stations") { StationSearchScreen(nav) }
             composable("map") { StationsMapScreen(nav, null) }
@@ -145,6 +154,8 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}, pendingRou
             composable("subscription/{id}") { SubscriptionScreen(nav, it.arguments!!.getString("id")!!) }
             composable("journey") { JourneyScreen(nav) }
             composable("settings") { SettingsScreen(nav) }
+            composable("settings/notifications") { NotificationSettingsScreen(nav) }
+            composable("settings/widgets") { WidgetSettingsScreen(nav) }
             composable("ticket/{id}") { TicketScreen(nav, it.arguments!!.getString("id")!!) }
             composable("line/{region}/{ab}/{ba}") {
                 val a = it.arguments!!

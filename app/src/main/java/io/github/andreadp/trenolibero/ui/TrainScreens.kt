@@ -106,11 +106,6 @@ fun TrainSearchScreen(nav: Nav) {
     Scaffold(topBar = {
         TopAppBar(
             title = { Text("Cerca treno") },
-            actions = {
-                IconButton(onClick = { nav.settings() }) {
-                    Icon(androidx.compose.material.icons.Icons.Default.Settings, "Impostazioni notifiche")
-                }
-            },
         )
     }) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize()) {
@@ -215,6 +210,7 @@ suspend fun resolveTrain(number: String, originId: String?, dateMs: Long?): Pair
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
+    KeepScreenOnIfEnabled()
     val state = rememberLoader(number, originId, dateMs, refreshMs = 30_000) {
         resolveTrain(number, originId, dateMs).also { (m, a) ->
             DetectionHistory.record(DetectionHistory.key(m.originId, m.number, m.dateMs), a)

@@ -1,1 +1,2 @@
-Widget: corretto un errore per cui i widget di partenze, abbonamento, biglietto e infomobilità dopo un po' venivano mostrati come widget del treno.
+Nuova schermata Impostazioni: tema chiaro/scuro, colori dinamici, schermata iniziale, frequenza di aggiornamento, schermo acceso sul treno, backup e ripristino dei dati, svuota cache.
+Widget: corretto un errore per cui partenze, abbonamento, biglietto e infomobilità dopo un po' venivano mostrati come widget del treno.

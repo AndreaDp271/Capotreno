@@ -364,7 +364,7 @@ fun FullscreenCode(b: android.graphics.Bitmap, onClose: () -> Unit) {
     androidx.compose.runtime.DisposableEffect(Unit) {
         val w = activity?.window
         val old = w?.attributes?.screenBrightness
-        w?.attributes = w?.attributes?.apply { screenBrightness = 1f }
+        if (io.github.andreadp.trenolibero.data.AppSettings.qrBrightness) w?.attributes = w?.attributes?.apply { screenBrightness = 1f }
         onDispose { w?.attributes = w?.attributes?.apply { screenBrightness = old ?: -1f } }
     }
     androidx.compose.ui.window.Dialog(onDismissRequest = onClose,

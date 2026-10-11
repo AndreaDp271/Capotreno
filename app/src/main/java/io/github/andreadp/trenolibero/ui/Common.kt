@@ -24,6 +24,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,14 +52,37 @@ private val Green = Color(0xFF0B5D3B)
 
 @Composable
 fun TrenoTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+    val dark = isDarkTheme()
+    val dynamic by io.github.andreadp.trenolibero.data.AppSettings.dynamicColor.collectAsState()
     val ctx = LocalContext.current
     val scheme = when {
-        Build.VERSION.SDK_INT >= 31 -> if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
+        Build.VERSION.SDK_INT >= 31 && dynamic -> if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
         dark -> darkColorScheme(primary = Color(0xFF7FD8A6), secondary = Color(0xFFFFC107))
         else -> lightColorScheme(primary = Green, secondary = Color(0xFF8A6D00))
     }
     MaterialTheme(colorScheme = scheme, content = content)
+}
+
+/** Tiene lo schermo acceso finché la schermata è visibile, se attivato nelle impostazioni. */
+@Composable
+fun KeepScreenOnIfEnabled() {
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.DisposableEffect(view) {
+        val on = io.github.andreadp.trenolibero.data.AppSettings.keepScreenOn
+        if (on) view.keepScreenOn = true
+        onDispose { if (on) view.keepScreenOn = false }
+    }
+}
+
+/** Tema scuro secondo la scelta nelle impostazioni (o quella di sistema). */
+@Composable
+fun isDarkTheme(): Boolean {
+    val theme by io.github.andreadp.trenolibero.data.AppSettings.theme.collectAsState()
+    return when (theme) {
+        io.github.andreadp.trenolibero.data.AppSettings.Theme.LIGHT -> false
+        io.github.andreadp.trenolibero.data.AppSettings.Theme.DARK -> true
+        io.github.andreadp.trenolibero.data.AppSettings.Theme.SYSTEM -> isSystemInDarkTheme()
+    }
 }
 
 object Palette {
@@ -90,6 +114,8 @@ class Loaded<T>(
  */
 @Composable
 fun <T> rememberLoader(vararg keys: Any?, refreshMs: Long? = null, block: suspend () -> T): Loaded<T> {
+    // intervallo scalato secondo l'impostazione "Aggiornamento automatico"
+    val every = remember(refreshMs) { refreshMs?.let { io.github.andreadp.trenolibero.data.AppSettings.refreshMs(it) } }
     var data by remember(*keys) { mutableStateOf<T?>(null) }
     var error by remember(*keys) { mutableStateOf<String?>(null) }
     var loading by remember(*keys) { mutableStateOf(true) }
@@ -108,22 +134,22 @@ fun <T> rememberLoader(vararg keys: Any?, refreshMs: Long? = null, block: suspen
                 error = errorMessage(e)
             }
             loading = false
-            if (refreshMs == null) break
-            delay(refreshMs)
+            if (every == null) break
+            delay(every)
         }
     }
-    if (refreshMs != null) {
+    if (every != null) {
         val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
         androidx.compose.runtime.DisposableEffect(owner, *keys) {
             val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
                 val age = System.currentTimeMillis() - (updatedAt ?: 0L)
-                if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME && !loading && age > refreshMs) tick++
+                if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME && !loading && age > every) tick++
             }
             owner.lifecycle.addObserver(obs)
             onDispose { owner.lifecycle.removeObserver(obs) }
         }
     }
-    return Loaded(data, error, loading, updatedAt, refreshMs) { tick++ }
+    return Loaded(data, error, loading, updatedAt, every) { tick++ }
 }
 
 /** Sottotitolo della barra: "Aggiornato alle 16:21 · ogni 30 s", con pallino che pulsa durante l'aggiornamento. */

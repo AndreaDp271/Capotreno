@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Graph.init(this)
+        io.github.andreadp.trenolibero.data.AppSettings.init(this)
         // osmdroid: User-Agent identificativo (richiesto dalla tile policy OSM) e cache nello spazio privato dell'app
         Configuration.getInstance().apply {
             userAgentValue = "${BuildConfig.APPLICATION_ID}/${BuildConfig.VERSION_NAME}"
@@ -72,6 +73,13 @@ class MainActivity : ComponentActivity() {
         io.github.andreadp.trenolibero.data.Notifier.schedule(this)
         io.github.andreadp.trenolibero.widget.Widgets.schedule(this)
         setContent {
+            // icone della barra di stato chiare o scure secondo il tema scelto nell'app
+            val dark = io.github.andreadp.trenolibero.ui.isDarkTheme()
+            androidx.compose.runtime.LaunchedEffect(dark) {
+                val style = if (dark) androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                else androidx.activity.SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                enableEdgeToEdge(style, style)
+            }
             TrenoTheme {
                 App(pendingImport, { pendingImport = null }, pendingRoute) { pendingRoute = null }
             }
