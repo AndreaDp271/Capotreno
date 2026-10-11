@@ -147,10 +147,24 @@ fun StationBoardScreen(nav: Nav, stationId: String, stationName: String) {
     fun pickTime() {
         val cal = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply { timeInMillis = timeMs ?: System.currentTimeMillis() }
         TimePickerDialog(ctx, { _, h, m ->
-            val c = Calendar.getInstance(ViaggiaTrenoApi.ROME)
+            // mantiene il giorno già scelto
+            val c = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply { timeInMillis = timeMs ?: System.currentTimeMillis() }
             c.set(Calendar.HOUR_OF_DAY, h); c.set(Calendar.MINUTE, m); c.set(Calendar.SECOND, 0)
             timeMs = c.timeInMillis
         }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).show()
+    }
+
+    /** Giorno del tabellone: da oggi in avanti (ViaggiaTreno non restituisce i giorni passati). */
+    fun pickDate() {
+        val cal = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply { timeInMillis = timeMs ?: System.currentTimeMillis() }
+        android.app.DatePickerDialog(ctx, { _, y, mo, d ->
+            val c = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply { timeInMillis = timeMs ?: System.currentTimeMillis() }
+            c.set(y, mo, d); c.set(Calendar.SECOND, 0)
+            timeMs = c.timeInMillis.coerceAtLeast(System.currentTimeMillis() - 60_000)
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).apply {
+            datePicker.minDate = System.currentTimeMillis() - 1000
+            datePicker.maxDate = System.currentTimeMillis() + 60L * 24 * 3600 * 1000
+        }.show()
     }
 
     Scaffold(
@@ -187,11 +201,15 @@ fun StationBoardScreen(nav: Nav, stationId: String, stationName: String) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 AssistChip(
-                    onClick = { pickTime() },
-                    label = { Text(if (timeMs == null) "Adesso" else "Dalle ${fmtTime(timeMs)}") },
+                    onClick = { pickDate() },
+                    label = { Text(boardDay(timeMs)) },
                     leadingIcon = { Icon(Icons.Default.DateRange, null) },
                 )
-                if (timeMs != null) AssistChip(onClick = { timeMs = null }, label = { Text("Torna ad adesso") })
+                AssistChip(
+                    onClick = { pickTime() },
+                    label = { Text(if (timeMs == null) "Adesso" else "Dalle ${fmtTime(timeMs)}") },
+                )
+                if (timeMs != null) AssistChip(onClick = { timeMs = null }, label = { Text("Adesso") })
             }
             if (state.loading && state.data != null) LinearProgressIndicator(Modifier.fillMaxWidth())
             LoadedContent(state) { list ->
@@ -257,5 +275,19 @@ private fun BoardRow(e: BoardEntry, departures: Boolean, onClick: () -> Unit) {
         } else {
             PlatformBadge(e.binarioProgrammatoArrivoDescrizione, e.binarioEffettivoArrivoDescrizione)
         }
+    }
+}
+
+/** "Oggi", "Domani" o il giorno abbreviato ("mer 15 ott"). */
+private fun boardDay(ms: Long?): String {
+    if (ms == null) return "Oggi"
+    val day = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply { timeInMillis = ms }
+    val today = Calendar.getInstance(ViaggiaTrenoApi.ROME)
+    val diff = ((day.apply { set(Calendar.HOUR_OF_DAY, 12) }.timeInMillis -
+        today.apply { set(Calendar.HOUR_OF_DAY, 12) }.timeInMillis) / (24 * 3600_000.0)).let { Math.round(it) }
+    return when (diff) {
+        0L -> "Oggi"
+        1L -> "Domani"
+        else -> java.text.SimpleDateFormat("EEE d MMM", java.util.Locale.ITALIAN).apply { timeZone = ViaggiaTrenoApi.ROME }.format(java.util.Date(ms))
     }
 }
