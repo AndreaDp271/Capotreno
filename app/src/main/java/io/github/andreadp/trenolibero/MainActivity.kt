@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.activity.ComponentActivity
@@ -61,6 +62,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Graph.init(this)
         io.github.andreadp.trenolibero.data.AppSettings.init(this)
+        if (io.github.andreadp.trenolibero.data.AppSettings.portrait.value) {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
         // osmdroid: User-Agent identificativo (richiesto dalla tile policy OSM) e cache nello spazio privato dell'app
         Configuration.getInstance().apply {
             userAgentValue = "${BuildConfig.APPLICATION_ID}/${BuildConfig.VERSION_NAME}"
@@ -79,6 +83,11 @@ class MainActivity : ComponentActivity() {
                 val style = if (dark) androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
                 else androidx.activity.SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
                 enableEdgeToEdge(style, style)
+            }
+            val portrait by io.github.andreadp.trenolibero.data.AppSettings.portrait.collectAsState()
+            androidx.compose.runtime.LaunchedEffect(portrait) {
+                requestedOrientation = if (portrait) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
             TrenoTheme {
                 App(pendingImport, { pendingImport = null }, pendingRoute) { pendingRoute = null }

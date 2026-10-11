@@ -101,6 +101,10 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}, pendingRou
         importTicket(uri).onSuccess { nav.ticket(it.id) }.onFailure { importError = errorMessage(it) }
         onImportHandled()
     }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    LaunchedEffect(Unit) { UpdateUi.checkOnStart(ctx, scope) }
+    UpdateDialog()
     LaunchedEffect(pendingRoute) {
         val r = pendingRoute ?: return@LaunchedEffect
         runCatching { controller.navigate(r) }

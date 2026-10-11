@@ -109,6 +109,9 @@ fun SettingsScreen(nav: Nav) {
     var refresh by remember { mutableStateOf(AppSettings.refresh) }
     var screenOn by remember { mutableStateOf(AppSettings.keepScreenOn) }
     var qrBright by remember { mutableStateOf(AppSettings.qrBrightness) }
+    val portrait by AppSettings.portrait.collectAsState()
+    var autoUpdate by remember { mutableStateOf(AppSettings.autoUpdateCheck) }
+    val fdroid = remember { io.github.andreadp.trenolibero.data.Updater.fromFDroid(ctx) }
     var startDialog by remember { mutableStateOf(false) }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var cacheDialog by remember { mutableStateOf(false) }
@@ -176,6 +179,13 @@ fun SettingsScreen(nav: Nav) {
                 Choice(AppSettings.Refresh.entries, refresh, { it.label }) { AppSettings.refresh = it; refresh = it }
                 Divider()
                 Item(
+                    painterResource(R.drawable.ic_set_rotate), SetColors.general, "Blocca in verticale",
+                    "Altrimenti l'app ruota insieme al telefono, se la rotazione automatica è attiva",
+                    trailing = { Switch(portrait, { AppSettings.setPortrait(it) }) },
+                    onClick = { AppSettings.setPortrait(!portrait) },
+                )
+                Divider()
+                Item(
                     painterResource(R.drawable.ic_set_phone), SetColors.general, "Schermo sempre acceso",
                     "Mentre segui un treno, nella pagina e sulla mappa",
                     trailing = { Switch(screenOn, { AppSettings.keepScreenOn = it; screenOn = it }) },
@@ -228,6 +238,29 @@ fun SettingsScreen(nav: Nav) {
             }
 
             Group("Informazioni") {
+                Item(
+                    painterResource(R.drawable.ic_set_update), SetColors.about, "Aggiornamenti", UpdateUi.summary(ctx),
+                    trailing = if (UpdateUi.phase is UpdateUi.Phase.Checking) {
+                        { androidx.compose.material3.CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp) }
+                    } else null,
+                    onClick = {
+                        when {
+                            fdroid -> open(ctx, io.github.andreadp.trenolibero.data.Updater.FDROID_PAGE)
+                            UpdateUi.phase is UpdateUi.Phase.Available -> UpdateUi.dialog = true
+                            else -> UpdateUi.check(scope, manual = true)
+                        }
+                    },
+                )
+                if (!fdroid) {
+                    Divider()
+                    Item(
+                        rememberVectorPainter(Icons.Default.Refresh), SetColors.about, "Controlla all'avvio",
+                        "Una volta al giorno cerca nuove versioni su GitHub",
+                        trailing = { Switch(autoUpdate, { AppSettings.autoUpdateCheck = it; autoUpdate = it }) },
+                        onClick = { AppSettings.autoUpdateCheck = !autoUpdate; autoUpdate = !autoUpdate },
+                    )
+                }
+                Divider()
                 Item(
                     painterResource(R.drawable.ic_set_code), SetColors.about, "Codice sorgente",
                     "github.com/AndreaDp271/Capotreno", onClick = { open(ctx, REPO) },

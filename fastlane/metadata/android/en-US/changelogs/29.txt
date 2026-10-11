@@ -1,2 +1,3 @@
-New Settings screen: light/dark theme, dynamic colors, start screen, refresh rate, keep screen on while following a train, data backup and restore, clear cache.
+New Options tab: light/dark theme, dynamic colors, start screen, refresh rate, portrait lock, keep screen on while following a train, data backup and restore, clear cache.
+Update check: when installed from GitHub, the app downloads and installs new versions (after verifying the signature). F-Droid installs keep updating through F-Droid.
 Widgets: fixed departures, season pass, ticket and travel info widgets turning into train widgets after a while.

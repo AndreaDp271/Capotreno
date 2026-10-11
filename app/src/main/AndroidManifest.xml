@@ -12,6 +12,8 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <!-- solo per scansionare il QR/Aztec del biglietto -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- aggiornamenti scaricati da GitHub (non usato se l'app è installata da F-Droid) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
@@ -48,6 +50,10 @@
         </activity>
 
         <!-- Widget della schermata home (Jetpack Glance) -->
+        <receiver
+            android:name=".data.UpdateReceiver"
+            android:exported="false" />
+
         <activity
             android:name=".widget.WidgetConfigActivity"
             android:exported="true"

@@ -25,12 +25,15 @@ object AppSettings {
     val theme: StateFlow<Theme> = _theme
     private val _dynamicColor = MutableStateFlow(true)
     val dynamicColor: StateFlow<Boolean> = _dynamicColor
+    private val _portrait = MutableStateFlow(true)
+    val portrait: StateFlow<Boolean> = _portrait
 
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         _theme.value = enumOr(prefs.getString("theme", null), Theme.SYSTEM)
         _dynamicColor.value = prefs.getBoolean("dynamic_color", true)
+        _portrait.value = prefs.getBoolean("portrait", true)
     }
 
     private inline fun <reified E : Enum<E>> enumOr(name: String?, default: E) =
@@ -38,6 +41,18 @@ object AppSettings {
 
     fun setTheme(t: Theme) { _theme.value = t; prefs.edit().putString("theme", t.name).apply() }
     fun setDynamicColor(v: Boolean) { _dynamicColor.value = v; prefs.edit().putBoolean("dynamic_color", v).apply() }
+
+    /** Blocca l'app in verticale invece di seguire la rotazione automatica del telefono. */
+    fun setPortrait(v: Boolean) { _portrait.value = v; prefs.edit().putBoolean("portrait", v).apply() }
+
+    /** Controllo degli aggiornamenti su GitHub all'avvio (al massimo una volta al giorno). */
+    var autoUpdateCheck: Boolean
+        get() = prefs.getBoolean("auto_update_check", true)
+        set(v) = prefs.edit().putBoolean("auto_update_check", v).apply()
+
+    var lastUpdateCheck: Long
+        get() = prefs.getLong("last_update_check", 0L)
+        set(v) = prefs.edit().putLong("last_update_check", v).apply()
 
     /** Scheda aperta all'avvio: home, stations, map, tickets, info. */
     var startTab: String
