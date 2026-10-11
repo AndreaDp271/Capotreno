@@ -1,11 +1,28 @@
-<p>Capotreno è un client libero e non ufficiale dei dati di infomobilità pubblicati su ViaggiaTreno (RFI/Trenitalia). Mostra le stesse informazioni del sito, in un'app leggera e senza pubblicità né tracciamento.</p>
-<p><b>Funzioni</b></p>
+<p>Capotreno è un'app libera e non ufficiale per i treni italiani in tempo reale, senza pubblicità, senza tracciamento e senza servizi Google.</p>
 <ul>
-<li><b>Andamento treno</b>: cerca per numero e vedi tutte le fermate con orari programmati, effettivi e previsti, ritardo, ultimo rilevamento, binari programmati ed effettivi (evidenziati se cambiano), fermate soppresse.</li>
-<li><b>Tabellone di stazione</b>: partenze e arrivi in tempo reale con ritardi e binari, anche a partire da un orario a scelta.</li>
-<li><b>Mappa</b> (OpenStreetMap): tutte le stazioni della rete e il percorso del treno con la posizione dell'ultimo rilevamento.</li>
-<li><b>Infomobilità</b>: avvisi sulla circolazione, notizie in evidenza e numero di treni in circolazione.</li>
-<li><b>Preferiti</b>: treni e stazioni salvati solo sul dispositivo.</li>
-<li>Aggiornamento automatico ogni minuto, tema chiaro/scuro.</li>
+<li><b>Andamento del treno:</b> una linea animata con le fermate già passate, il treno in viaggio tra una stazione e l'altra e le fermate ancora da fare. Mostra ritardi, orari programmati, effettivi e previsti, binari (anche quando cambiano) e l'ultimo rilevamento.</li>
+<li><b>Tabelloni di stazione:</b> partenze e arrivi in tempo reale con ritardi e binari, anche a partire da un orario scelto.</li>
+<li><b>Mappe</b> (OpenStreetMap):
+<ul>
+<li>tutte le stazioni e le linee con i treni in transito;</li>
+<li>il percorso di ogni treno disegnato sui veri binari OSM, grazie a un grafo ferroviario incluso nell'app.</li>
+</ul></li>
+<li><b>Cerca viaggio</b> da A a B, filtrabile per tipo di treno e compagnia. I dati vengono da lefrecce.it (Trenitalia) e ViaggiaTreno; il pulsante "Acquista" apre il sito del venditore.</li>
+<li><b>Biglietti e abbonamenti:</b>
+<ul>
+<li>si importano da PDF o da immagine, oppure scansionando il QR/Aztec con la fotocamera;</li>
+<li>il codice si mostra a schermo intero per il controllore;</li>
+<li>per un abbonamento, l'app elenca i treni su cui è valido.</li>
+</ul></li>
+<li><b>Vicino a te</b> (facoltativo): le stazioni più vicine e la tua posizione sulle mappe. La posizione non lascia mai il telefono.</li>
+<li><b>Notifiche facoltative:</b> ritardi e cambi di binario dei treni salvati e dei biglietti, sveglia prima della tua fermata, scioperi, disagi sulle tue linee e riepilogo delle partenze a orario fisso. I controlli avvengono sul telefono, senza server esterni.</li>
+<li><b>Widget per la schermata home:</b> stato di un treno, partenze da una stazione, treni dell'abbonamento, prossimo biglietto con il codice e infomobilità.</li>
 </ul>
-<p>L'app non è affiliata né approvata da Trenitalia, RFI o Gruppo FS. I dati provengono dal servizio pubblico viaggiatreno.it, che non è software libero (per questo l'app è segnalata con l'anti-feature "Servizio di rete non libero").</p>
+<p><b>Permessi</b>, tutti facoltativi e chiesti solo quando usi la funzione:</p>
+<ul>
+<li>posizione: stazioni vicine e posizione sulle mappe;</li>
+<li>fotocamera: scansione del codice del biglietto;</li>
+<li>notifiche: gli avvisi descritti sopra.</li>
+</ul>
+<p><b>Rete</b>: i dati vengono da viaggiatreno.it (RFI) e lefrecce.it (Trenitalia), servizi non liberi (anti-feature NonFreeNet), e le mappe da OpenStreetMap. viaggiatreno.it funziona solo in HTTP, quindi il traffico in chiaro è permesso solo verso quel dominio.</p>
+<p>App non affiliata né approvata da Trenitalia, RFI o Gruppo FS.</p>

@@ -1,9 +1,29 @@
-<p>Capotreno is a free and unofficial client for the Italian railway real-time data published by ViaggiaTreno (RFI/Trenitalia). It shows the same information as the website in a lightweight app without ads or tracking.</p>
+<p>Capotreno is a free and unofficial app for Italian railway real-time data. It has no ads, no trackers and no Google services.</p>
+<p><b>The interface is in Italian.</b></p>
 <ul>
-<li><b>Train status</b>: search by number to see every stop with scheduled, actual and expected times, delay, last detection point, scheduled and actual platforms, cancelled stops.</li>
-<li><b>Station board</b>: real-time departures and arrivals with delays and platforms, also from a chosen time.</li>
-<li><b>Map</b> (OpenStreetMap): all stations and the train route with its last known position.</li>
-<li><b>Travel info</b>: service disruption notices and number of trains running.</li>
-<li><b>Favourites</b> stored only on the device.</li>
+<li><b>Train status:</b> an animated timeline of the stops already passed, the train moving between stations and the stops still ahead. It shows delays, scheduled, actual and predicted times, platforms (including platform changes) and the last detection point.</li>
+<li><b>Station boards:</b> live departures and arrivals with delays and platforms, also from a time you choose.</li>
+<li><b>Maps</b> (OpenStreetMap):
+<ul>
+<li>all stations, and the lines with the trains currently running on them;</li>
+<li>each train's route drawn on real OSM rail tracks, using a rail graph bundled in the app.</li>
+</ul></li>
+<li><b>Journey search</b> from A to B, filterable by train type and operator. Results come from lefrecce.it (Trenitalia) and ViaggiaTreno. A "Buy" button opens the seller's website.</li>
+<li><b>Tickets and season passes:</b>
+<ul>
+<li>import them from PDF or image, or scan their QR/Aztec code with the camera;</li>
+<li>the code is shown full screen for the conductor;</li>
+<li>for a season pass, the app lists the trains it is valid for.</li>
+</ul></li>
+<li><b>Near me</b> (optional): the nearest stations and your position on the maps. Your location never leaves the device.</li>
+<li><b>Optional notifications:</b> delays and platform changes for saved trains and tickets, a wake-up alert before your stop, strikes, disruptions on your lines and a daily departures summary. All checks run on the device; there is no push server.</li>
+<li><b>Home screen widgets:</b> train status, station departures, season pass trains, your next ticket with its code, and travel alerts.</li>
 </ul>
-<p>Not affiliated with or endorsed by Trenitalia, RFI or FS Group. Data comes from the viaggiatreno.it public service, which is not free software (NonFreeNet anti-feature).</p>
+<p><b>Permissions</b>, all optional and asked only when you use the feature:</p>
+<ul>
+<li>location: nearest stations and your position on the maps;</li>
+<li>camera: ticket code scanning;</li>
+<li>notifications: the alerts above.</li>
+</ul>
+<p><b>Network</b>: data comes from viaggiatreno.it (RFI) and lefrecce.it (Trenitalia), which are not free software (NonFreeNet anti-feature), and map tiles come from OpenStreetMap. viaggiatreno.it only works over plain HTTP; cleartext traffic is allowed for that domain only.</p>
+<p>Not affiliated with or endorsed by Trenitalia, RFI or FS Group.</p>
