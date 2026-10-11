@@ -13,18 +13,27 @@ AutoName: Capotreno
 
 RepoType: git
 Repo: https://github.com/AndreaDp271/Capotreno.git
+Binaries: https://github.com/AndreaDp271/Capotreno/releases/download/v%v/Capotreno-%v.apk
 
 Builds:
-  - versionName: 2.2.2
-    versionCode: 25
-    commit: fe5305698350724b1980a2e45928690a36a50a39
+  - versionName: 2.3.0
+    versionCode: 26
+    commit: d719a4a1c04b62cd126629211acc036849c6fe9e
     subdir: app
     gradle:
       - yes
     scanignore:
       - app/src/main/assets/rail_graph.bin
 
+AllowedAPKSigningKeys: 51c3eaab3a8a16d932fc9b42b659fa89ccbcb2565868968cd649db18158adcd0
+
+MaintainerNotes: |-
+  app/src/main/assets/rail_graph.bin is data, not code: a gzip-compressed graph of the
+  Italian rail network (nodes, edges, track geometry) used to draw train routes offline.
+  It is generated from OpenStreetMap (ODbL) with tools/build_rail_graph.py (pyosmium) from the
+  Geofabrik italy-latest.osm.pbf extract (~2 GB), see README; hence the scanignore.
+
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 2.2.2
-CurrentVersionCode: 25
+CurrentVersion: 2.3.0
+CurrentVersionCode: 26
