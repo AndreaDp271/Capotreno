@@ -165,8 +165,9 @@ object JourneySearch {
         if ("no travel solutions" in msg.lowercase()) {
             val far = time.time - System.currentTimeMillis() > 30L * 24 * 3600_000
             return IOException(
-                if (far) "Trenitalia non ha ancora pubblicato gli orari per questa data. La vendita apre di solito fino al " +
-                    "prossimo cambio orario (metà dicembre o metà giugno): riprova più avanti o scegli una data più vicina."
+                if (far) "Nessuna soluzione in vendita per questa data. Trenitalia vende i treni regionali solo fino al " +
+                    "prossimo cambio orario (metà dicembre o metà giugno); Frecce e Intercity anche con mesi di anticipo. " +
+                    "Riprova più avanti o scegli una data più vicina."
                 else "Nessuna soluzione trovata per questa data e quest'ora"
             )
         }
