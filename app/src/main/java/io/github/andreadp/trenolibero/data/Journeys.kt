@@ -139,7 +139,7 @@ object JourneySearch {
         val t = tren.await()
         val out = merge(t.getOrDefault(emptyList()), direct.await())
         // senza risultati, l'errore di LeFrecce spiega il perché (per i giorni futuri è l'unica fonte)
-        t.exceptionOrNull()?.let { e -> if (out.isEmpty()) throw IOException("Il servizio Trenitalia non risponde: ${e.message ?: e.javaClass.simpleName}") }
+        t.exceptionOrNull()?.let { e -> if (out.isEmpty()) throw e }
         out
     }
 
@@ -152,6 +152,25 @@ object JourneySearch {
         val numbers = out.filter { it.legs.size == 1 }.map { it.legs.single().number }.toSet()
         out += direct.filter { it.legs.single().number !in numbers }
         return out.sortedBy { it.departure }
+    }
+
+    /**
+     * Errore di LeFrecce in italiano. Per le date oltre il prossimo cambio orario (metà giugno / metà dicembre)
+     * Trenitalia non ha ancora pubblicato le soluzioni e risponde "no travel solutions".
+     */
+    private fun lefrecceError(code: Int, body: String?, time: Date): IOException {
+        val msg = runCatching {
+            (ViaggiaTrenoApi.json.parseToJsonElement(body!!) as JsonObject)["message"]?.jsonPrimitive?.contentOrNull
+        }.getOrNull().orEmpty()
+        if ("no travel solutions" in msg.lowercase()) {
+            val far = time.time - System.currentTimeMillis() > 30L * 24 * 3600_000
+            return IOException(
+                if (far) "Trenitalia non ha ancora pubblicato gli orari per questa data. La vendita apre di solito fino al " +
+                    "prossimo cambio orario (metà dicembre o metà giugno): riprova più avanti o scegli una data più vicina."
+                else "Nessuna soluzione trovata per questa data e quest'ora"
+            )
+        }
+        return IOException("Il servizio Trenitalia non risponde (errore $code)" + if (msg.isNotBlank()) ": $msg" else "")
     }
 
     private suspend fun trenitalia(from: StationRef, to: StationRef, time: Date): List<Journey> = withContext(Dispatchers.IO) {
@@ -177,7 +196,7 @@ object JourneySearch {
                 .post(body.toRequestBody("application/json".toMediaType()))
                 .build()
             val text = client.newCall(req).execute().use { r ->
-                if (!r.isSuccessful) { if (page == 0) throw IOException("errore ${r.code}") else return@flatMap emptyList() }
+                if (!r.isSuccessful) { if (page == 0) throw lefrecceError(r.code, r.body?.string(), time) else return@flatMap emptyList() }
                 r.body?.string()
             } ?: return@flatMap emptyList()
             val root = ViaggiaTrenoApi.json.parseToJsonElement(text) as? JsonObject ?: return@flatMap emptyList()
