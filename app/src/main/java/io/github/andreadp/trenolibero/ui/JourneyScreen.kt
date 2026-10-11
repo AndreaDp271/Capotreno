@@ -125,11 +125,17 @@ fun JourneyScreen(nav: Nav) {
     fun pickDateTime() {
         val cal = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply { timeInMillis = timeMs ?: System.currentTimeMillis() }
         DatePickerDialog(ctx, { _, y, m, d ->
-            TimePickerDialog(ctx, { _, h, min ->
+            fun apply(h: Int, min: Int) {
                 timeMs = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply { set(y, m, d, h, min, 0) }.timeInMillis
                 search()
-            }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).show()
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+            }
+            TimePickerDialog(ctx, { _, h, min -> apply(h, min) }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).apply {
+                // chiudendo l'orologio il giorno scelto resta valido, con l'ora di prima
+                setOnCancelListener { apply(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE)) }
+            }.show()
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).apply {
+            datePicker.minDate = System.currentTimeMillis() - 1000
+        }.show()
     }
 
     Scaffold(
