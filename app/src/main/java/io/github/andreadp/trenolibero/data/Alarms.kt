@@ -82,7 +82,7 @@ class AlarmWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
             StopAlarms.cancel(ctx, alarm); return Result.success()
         }
         val scheduled = stop.arrivoTeorico ?: stop.programmata ?: run { StopAlarms.cancel(ctx, alarm); return Result.success() }
-        val delayMin = if (stop.arrivoReale != null) 0 else (stop.ritardo ?: a.ritardo ?: 0)
+        val delayMin = if (stop.arrivoReale != null) 0 else (stop.ritardo?.takeIf { it != 0 } ?: a.ritardo ?: 0) // 0 sulle fermate non ancora raggiunte: vale il ritardo del treno
         val expected = stop.arrivoReale ?: (scheduled + delayMin * 60_000L)
         val remaining = expected - now
         val lead = alarm.minutesBefore * 60_000L

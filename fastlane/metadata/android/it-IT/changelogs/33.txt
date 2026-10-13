@@ -1,0 +1,3 @@
+Sveglia prima della fermata: ora tiene conto del ritardo del treno anche per le fermate non ancora raggiunte.
+Accessibilità: i pulsanti Scansiona, Importa file, Importa PDF e Nuovo abbonamento hanno un'etichetta per TalkBack.
+Schede: aprendo Info da una notifica o da un widget, il tocco su Treni torna correttamente alla ricerca treni.

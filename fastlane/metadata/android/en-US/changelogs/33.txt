@@ -1,0 +1,3 @@
+Stop alarm: now accounts for the train delay at stops not reached yet.
+Accessibility: the Scan, Import file, Import PDF and New season pass buttons have a TalkBack label.
+Tabs: after opening Info from a notification or widget, tapping Trains goes back to the train search.

@@ -1,5 +1,7 @@
 package io.github.andreadp.trenolibero.ui
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -118,22 +120,30 @@ fun TicketsScreen(nav: Nav) {
             if (tab == 1) Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ExtendedFloatingActionButton(
                     onClick = { subPicker.launch(arrayOf("application/pdf", "image/*")) },
+                    // etichetta esplicita per TalkBack
+                    modifier = Modifier.semantics { contentDescription = "Importa PDF" },
                     icon = { Icon(painterResource(R.drawable.ic_tab_ticket), null) },
                     text = { Text("Importa PDF") },
                 )
                 ExtendedFloatingActionButton(
                     onClick = { newSub = true },
+                    // etichetta esplicita per TalkBack
+                    modifier = Modifier.semantics { contentDescription = "Nuovo abbonamento" },
                     icon = { Icon(Icons.Default.Add, null) },
                     text = { Text("Nuovo abbonamento") },
                 )
             } else Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ExtendedFloatingActionButton(
                     onClick = { nav.scan() },
+                    // etichetta esplicita per TalkBack
+                    modifier = Modifier.semantics { contentDescription = "Scansiona" },
                     icon = { Icon(painterResource(R.drawable.ic_qr_scan), null) },
                     text = { Text("Scansiona") },
                 )
                 ExtendedFloatingActionButton(
                     onClick = { picker.launch(arrayOf("application/pdf", "image/*")) },
+                    // etichetta esplicita per TalkBack
+                    modifier = Modifier.semantics { contentDescription = "Importa file" },
                     icon = { Icon(Icons.Default.Add, null) },
                     text = { Text("Importa file") },
                 )
