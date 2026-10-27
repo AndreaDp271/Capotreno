@@ -16,9 +16,9 @@ Repo: https://github.com/AndreaDp271/Capotreno.git
 Binaries: https://github.com/AndreaDp271/Capotreno/releases/download/v%v/Capotreno-%v.apk
 
 Builds:
-  - versionName: 2.4.4
-    versionCode: 33
-    commit: 72245caefa2d83690f7d5e7e542bb61213f678ce
+  - versionName: 2.5.0
+    versionCode: 34
+    commit: e3794b9f9dfa00e2aa9bf4c40a89979520b3d423
     subdir: app
     gradle:
       - yes
@@ -35,5 +35,5 @@ MaintainerNotes: |-
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 2.4.4
-CurrentVersionCode: 33
+CurrentVersion: 2.5.0
+CurrentVersionCode: 34
