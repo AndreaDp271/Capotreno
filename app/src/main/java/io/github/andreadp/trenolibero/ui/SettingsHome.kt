@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -242,6 +243,27 @@ fun SettingsScreen(nav: Nav) {
             }
 
             Group("Informazioni") {
+                if (Build.VERSION.SDK_INT >= 33) {
+                    Item(
+                        rememberVectorPainter(Icons.Default.Settings), SetColors.about, "Lingua",
+                        "Apre le impostazioni di Android per la lingua dell'app",
+                        onClick = {
+                            runCatching {
+                                ctx.startActivity(
+                                    Intent(android.provider.Settings.ACTION_APP_LOCALE_SETTINGS, Uri.parse("package:${ctx.packageName}"))
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }
+                        },
+                    )
+                    Divider()
+                }
+                Item(
+                    rememberVectorPainter(Icons.Default.Notifications), SetColors.about, "Guida introduttiva",
+                    "Rivedi le funzioni dell'app e i permessi",
+                    onClick = { io.github.andreadp.trenolibero.data.AppSettings.showGuide(true) },
+                )
+                Divider()
                 Item(
                     painterResource(R.drawable.ic_set_update), SetColors.about, "Aggiornamenti", UpdateUi.summary(ctx),
                     trailing = if (UpdateUi.phase is UpdateUi.Phase.Checking) {

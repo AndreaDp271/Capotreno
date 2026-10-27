@@ -36,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
@@ -104,6 +105,8 @@ fun JourneyScreen(nav: Nav) {
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     val listState = rememberLazyListState()
+    var frequent by remember { mutableStateOf<io.github.andreadp.trenolibero.data.FrequentTrip?>(null) }
+    frequent?.let { FrequentTripDialog(it, isNew = true) { frequent = null } }
 
     fun ref(s: String?) = s?.split("|", limit = 2)?.let { StationRef(it[0], it[1]) }
 
@@ -149,6 +152,22 @@ fun JourneyScreen(nav: Nav) {
             TopAppBar(
                 title = { Text("Cerca viaggio") },
                 navigationIcon = { IconButton(onClick = { nav.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro") } },
+                actions = {
+                    val a = ref(from)
+                    val b = ref(to)
+                    if (a != null && b != null) {
+                        IconButton(onClick = {
+                            // fascia proposta: l'ora della ricerca (o adesso) arrotondata, per un'ora e mezza
+                            val cal = Calendar.getInstance(ViaggiaTrenoApi.ROME).apply { timeInMillis = timeMs ?: System.currentTimeMillis() }
+                            val h = cal.get(Calendar.HOUR_OF_DAY)
+                            frequent = io.github.andreadp.trenolibero.data.FrequentTrip(
+                                id = java.util.UUID.randomUUID().toString(),
+                                fromId = a.id, fromName = a.name, toId = b.id, toName = b.name,
+                                start = "%02d:00".format(h), end = "%02d:30".format((h + 1) % 24),
+                            )
+                        }) { Icon(Icons.Default.DateRange, "Salva come viaggio frequente") }
+                    }
+                },
             )
         },
     ) { pad ->

@@ -146,6 +146,36 @@ fun categorize(n: InfoNews, fromWorksFeed: Boolean): InfoCategory {
     }
 }
 
+/** Prime parole troppo comuni nei toponimi per riconoscere una località da sole ("Città di CASTELLO" non è Castello di Godego). */
+private val GENERIC_PLACE_WORDS = setOf(
+    "CASTELLO", "CASTEL", "SAN", "SANTA", "SANT", "SANTO", "PORTO", "PORTA", "PONTE", "MONTE", "VILLA", "BORGO", "CAMPO",
+    "TORRE", "POGGIO", "FONTANA", "ROCCA", "PIEVE", "CASA", "CASALE", "CORTE", "COLLE", "VALLE", "MARINA", "LIDO", "TORRI",
+)
+
+/**
+ * Località di una stazione per cercarla negli avvisi: la prima parola del nome ("PADOVA", "CASTELFRANCO"), se abbastanza lunga;
+ * se è una parola comune nei toponimi ("CASTELLO", "SAN"…) tutto il nome ("CASTELLO DI GODEGO").
+ */
+fun placeKey(stationName: String): String? {
+    val name = DetectionLocator.normalize(stationName)
+    val first = name.split(" ").firstOrNull() ?: return null
+    return if (first in GENERIC_PLACE_WORDS) name.takeIf { it.length >= 4 } else first.takeIf { it.length >= 4 }
+}
+
+/** Testo semplice dell'avviso (il corpo arriva in HTML). */
+fun InfoNews.plainText(): String =
+    android.text.Html.fromHtml(html, 0).toString().replace(Regex("\\s*\n\\s*"), "\n").trim()
+
+/** Avvisi di infomobilità che citano una delle località [places] (nel titolo o nel testo). */
+fun alertsFor(news: List<InfoNews>, places: Set<String>): List<InfoNews> {
+    if (places.isEmpty()) return emptyList()
+    return news.filter { n ->
+        // a parole intere, anche per i nomi di più parole ("CASTELLO DI GODEGO")
+        val text = " ${DetectionLocator.normalize(n.title + " " + n.plainText())} "
+        places.any { " $it " in text }
+    }
+}
+
 /** Linea (tratta) della mappa: segmento tra due nodi, "occupata" se ci sono treni in transito. */
 @Serializable
 data class Tratta(

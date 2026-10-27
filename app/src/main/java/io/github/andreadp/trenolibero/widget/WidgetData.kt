@@ -3,6 +3,7 @@ package io.github.andreadp.trenolibero.widget
 import android.content.Context
 import io.github.andreadp.trenolibero.data.Graph
 import io.github.andreadp.trenolibero.data.InfoCategory
+import io.github.andreadp.trenolibero.data.LiveTrain
 import io.github.andreadp.trenolibero.data.Ticket
 import io.github.andreadp.trenolibero.data.ViaggiaTrenoApi
 import io.github.andreadp.trenolibero.data.categorize
@@ -100,8 +101,19 @@ data class TrainW(
     val updatedAt: Long,
 )
 
-/** Selezione "numero|origine|data|etichetta" (origine e data facoltative: si usa il treno di oggi). */
-suspend fun loadTrain(selection: String): TrainW {
+/**
+ * Selezione "numero|origine|data|etichetta" (origine e data facoltative: si usa il treno di oggi),
+ * oppure [LiveTrain.WIDGET_SELECTION]: il treno seguito in notifica, qualunque sia.
+ */
+suspend fun loadTrain(ctx: Context, selection: String): TrainW {
+    if (selection == LiveTrain.WIDGET_SELECTION) {
+        val live = LiveTrain.current(ctx) ?: return TrainW(
+            title = "Treno seguito", route = "",
+            status = "Nessun treno seguito. Apri un treno, tocca il cuoricino e attiva «Banner del viaggio».",
+            phase = "unavailable", number = "", originId = "", dateMs = 0, updatedAt = System.currentTimeMillis(),
+        )
+        return loadTrain(ctx, "$live|")
+    }
     val (num, origin, date, label) = (selection.split("|", limit = 4) + listOf("", "", "")).take(4)
     val dateMs = date.toLongOrNull()
     fun unavailable(why: String) = TrainW(

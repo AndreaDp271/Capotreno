@@ -75,6 +75,11 @@ class NotifySettings(context: Context) {
         get() = p.getBoolean("subscriptionTrains", false)
         set(v) = p.edit().putBoolean("subscriptionTrains", v).apply()
 
+    /** Avvisi dei monitor RFI delle stazioni preferite: attivi di default, serve solo salvare una stazione. */
+    var stationNotices: Boolean
+        get() = p.getBoolean("stationNotices", true)
+        set(v) = p.edit().putBoolean("stationNotices", v).apply()
+
     val anyEnabled get() = favorites || tickets || strikes || subscriptions || digest || disruptions || subscriptionTrains
 }
 
@@ -90,6 +95,9 @@ object Notifier {
     const val CH_ALARMS = "sveglia"
     const val CH_DIGEST = "riepilogo"
     const val CH_DISRUPTIONS = "disagi"
+    const val CH_LIVE = "seguito"
+    const val CH_FREQUENT = "frequenti"
+    const val CH_STATIONS = "stazioni"
     private const val WORK = "monitor"
 
     const val EXTRA_TRAIN = "open_train"       // "numero|origine|dataMs"
@@ -113,7 +121,13 @@ object Notifier {
             NotificationChannel(CH_DIGEST, "Riepilogo partenze", NotificationManager.IMPORTANCE_DEFAULT)
                 .apply { description = "Prossimi treni dalla stazione scelta, a orario fisso" },
             NotificationChannel(CH_DISRUPTIONS, "Disagi sulle tue linee", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Guasti e rallentamenti nelle località dei tuoi viaggi" },
+                .apply { description = "Guasti e rallentamenti nelle località dei tuoi viaggi e delle linee preferite" },
+            NotificationChannel(CH_FREQUENT, "Viaggi frequenti", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "Avviso prima della partenza dei treni dei tuoi viaggi frequenti" },
+            NotificationChannel(CH_STATIONS, "Avvisi di stazione", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Avvisi dei monitor delle stazioni preferite" },
+            NotificationChannel(CH_LIVE, "Treno seguito", NotificationManager.IMPORTANCE_LOW)
+                .apply { description = "Notifica fissa con la linea delle fermate del treno che stai seguendo"; setShowBadge(false) },
         ).forEach { nm.createNotificationChannel(it) }
     }
 
@@ -123,31 +137,68 @@ object Notifier {
     /** Avvia o ferma il controllo periodico in base alle impostazioni. */
     fun schedule(ctx: Context) {
         val wm = WorkManager.getInstance(ctx)
-        if (!NotifySettings(ctx).anyEnabled) { wm.cancelUniqueWork(WORK); return }
+        val s = NotifySettings(ctx)
+        val lines = !ctx.getSharedPreferences("favorites", Context.MODE_PRIVATE).getStringSet("lines", emptySet()).isNullOrEmpty()
+        val stations = lines || s.stationNotices && !ctx.getSharedPreferences("favorites", Context.MODE_PRIVATE).getStringSet("stations", emptySet()).isNullOrEmpty()
+        if (!s.anyEnabled && !stations && !FrequentTrips.anyEnabled(ctx)) { wm.cancelUniqueWork(WORK); return }
         val req = PeriodicWorkRequestBuilder<MonitorWorker>(15, TimeUnit.MINUTES)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .build()
         wm.enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, req)
     }
 
-    fun notify(ctx: Context, channel: String, id: Int, title: String, text: String, extra: Pair<String, String>? = null) {
-        if (!canNotify(ctx)) return
+    private val subTexts = mapOf(
+        CH_TRAINS to "Treno preferito", CH_TICKETS to "Biglietto", CH_STRIKES to "Scioperi", CH_SUBS to "Abbonamento",
+        CH_ALARMS to "Sveglia fermata", CH_DIGEST to "Riepilogo partenze", CH_DISRUPTIONS to "Disagi", CH_LIVE to "Treno seguito",
+        CH_FREQUENT to "Viaggio frequente", CH_STATIONS to "Stazione preferita",
+    )
+
+    /** Base comune: icona, colore, categoria e tocco che apre l'app sulla schermata giusta. */
+    fun builder(ctx: Context, channel: String, id: Int, extra: Pair<String, String>?): NotificationCompat.Builder {
         val intent = Intent(ctx, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             extra?.let { putExtra(it.first, it.second) }
         }
         val pi = PendingIntent.getActivity(ctx, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val n = NotificationCompat.Builder(ctx, channel)
+        return NotificationCompat.Builder(ctx, channel)
             .setSmallIcon(R.drawable.ic_tab_train)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setColor(TrainBanner.ACCENT)
+            .setSubText(subTexts[channel])
             .setContentIntent(pi)
             .setAutoCancel(true)
-            .setPriority(if (channel == CH_TRAINS || channel == CH_TICKETS) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
-            .build()
+            .setCategory(if (channel == CH_ALARMS) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_STATUS)
+            .setPriority(if (channel == CH_TRAINS || channel == CH_TICKETS || channel == CH_ALARMS || channel == CH_FREQUENT) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
+    }
+
+    /**
+     * Con [hero] la notifica è una card a gradiente (un dato grande e una tessera); [follow] aggiunge il pulsante "Segui"
+     * per il treno in [extra]. Senza [hero], o se la card non viene accettata, è testo lungo.
+     */
+    fun notify(
+        ctx: Context, channel: String, id: Int, title: String, text: String, extra: Pair<String, String>? = null,
+        hero: NotificationCard.Hero? = null, follow: Boolean = false,
+    ) {
+        if (!canNotify(ctx)) return
+        fun plain() = builder(ctx, channel, id, extra).setContentTitle(title).setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        val nm = NotificationManagerCompat.from(ctx)
+        if (hero != null) {
+            val card = runCatching {
+                val b = plain()
+                    .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                    .setCustomContentView(NotificationCard.small(ctx, hero))
+                    .setCustomBigContentView(NotificationCard.big(ctx, hero))
+                val value = extra?.takeIf { it.first == EXTRA_TRAIN }?.second
+                if (follow && value != null && value !in LiveTrain.all(ctx)) {
+                    b.addAction(R.drawable.ic_tab_train, "Segui", LiveTrain.followIntent(ctx, value))
+                }
+                @Suppress("MissingPermission")
+                nm.notify(id, b.build())
+            }
+            if (card.isSuccess) return
+        }
         @Suppress("MissingPermission")
-        NotificationManagerCompat.from(ctx).notify(id, n)
+        nm.notify(id, plain().build())
     }
 }
 
@@ -164,8 +215,10 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         if (settings.strikes) runCatching { checkStrikes() }
         if (settings.subscriptions) runCatching { checkSubscriptions() }
         if (settings.digest) runCatching { checkDigest() }
-        if (settings.disruptions) runCatching { checkDisruptions() }
+        if (settings.disruptions || Graph.favorites.lines.value.isNotEmpty()) runCatching { checkDisruptions() }
         if (settings.subscriptionTrains) runCatching { checkSubscriptionTrains() }
+        if (settings.stationNotices) runCatching { checkStationNotices() }
+        runCatching { FrequentTrips.plan(applicationContext, state) }
         return Result.success()
     }
 
@@ -184,9 +237,9 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         key: String, a: Andamento, platformStop: Fermata?, channel: String, extra: Pair<String, String>, prefix: String,
     ) {
         val id = key.hashCode()
-        val route = "${a.origine.orEmpty()} → ${a.destinazione.orEmpty()}"
+        val route = "${TrainBanner.pretty(a.origine.orEmpty())} → ${TrainBanner.pretty(a.destinazione.orEmpty())}"
         if (a.cancelled && once("$key:cancel")) {
-            Notifier.notify(applicationContext, channel, id, "$prefix${a.title} soppresso", route, extra); return
+            Notifier.notify(applicationContext, channel, id, "$prefix${a.title} soppresso", route, extra, TrainAlerts.cancelled(a), follow = false); return
         }
         val delay = a.ritardo ?: 0
         val last = state.getInt("$key:delay", Int.MIN_VALUE)
@@ -194,14 +247,15 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
             state.edit().putInt("$key:delay", delay).apply()
             val where = a.stazioneUltimoRilevamento?.takeIf { it.isNotBlank() && it != "--" }
                 ?.let { "\nUltimo rilevamento: $it alle ${hm(a.oraUltimoRilevamento)}" }.orEmpty()
-            Notifier.notify(applicationContext, channel, id, "$prefix${a.title}: +$delay min", route + where, extra)
+            Notifier.notify(applicationContext, channel, id, "$prefix${a.title}: +$delay min", route + where, extra, TrainAlerts.delay(a), follow = true)
         }
         val prog = platformLabel(platformStop?.binarioProgrammatoPartenzaDescrizione).orEmpty()
         val eff = platformLabel(platformStop?.binarioEffettivoPartenzaDescrizione).orEmpty()
         if (eff.isNotEmpty() && prog.isNotEmpty() && eff != prog && once("$key:platform:$eff")) {
             Notifier.notify(
                 applicationContext, channel, id + 1, "$prefix${a.title}: cambio binario",
-                "A ${platformStop?.stazione.orEmpty()} parte dal binario $eff (era $prog)", extra,
+                "A ${TrainBanner.pretty(platformStop?.stazione.orEmpty())} parte dal binario $eff (era $prog)", extra,
+                TrainAlerts.platformChange(a, platformStop, prog, eff), follow = true,
             )
         }
     }
@@ -239,11 +293,12 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
                 val seat = listOfNotNull(
                     t.coach.takeIf { it.isNotEmpty() }?.let { "carrozza $it" },
                     t.seat.takeIf { it.isNotEmpty() }?.let { "posto $it" },
-                ).joinToString(", ").let { if (it.isEmpty()) "" else "\n${it.replaceFirstChar { c -> c.uppercase() }}" }
+                ).joinToString(", ").replaceFirstChar { c -> c.uppercase() }
                 Notifier.notify(
                     applicationContext, Notifier.CH_TICKETS, "ticket:${t.id}".hashCode(),
                     "Tra $minutes min parte il tuo ${a.title}",
-                    "Alle ${hm(dep)} da ${stop?.stazione ?: t.from}$platform$delay$seat", extra,
+                    "Alle ${hm(dep)} da ${TrainBanner.pretty(stop?.stazione ?: t.from)}$platform$delay" + if (seat.isEmpty()) "" else "\n$seat", extra,
+                    TrainAlerts.reminder(a, stop, minutes, t.to, seat.ifEmpty { null }), follow = true,
                 )
             }
             if (now in (dep - 60 * 60_000L)..(arr + 15 * 60_000L)) {
@@ -256,9 +311,15 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         val news = ViaggiaTrenoApi.infomobility(works = false) + runCatching { ViaggiaTrenoApi.infomobility(works = true) }.getOrDefault(emptyList())
         news.filter { categorize(it, false) == InfoCategory.STRIKE }.take(3).forEach { n ->
             if (once("strike:${n.title.hashCode()}")) {
-                Notifier.notify(applicationContext, Notifier.CH_STRIKES, n.title.hashCode(), "Sciopero", n.title, Notifier.EXTRA_INFO to "1")
+                Notifier.notify(applicationContext, Notifier.CH_STRIKES, n.title.hashCode(), "Sciopero", fullText(n), Notifier.EXTRA_INFO to "1", TrainAlerts.strike(n))
             }
         }
+    }
+
+    /** Titolo dell'avviso seguito dal testo, per la notifica espansa. */
+    private fun fullText(n: InfoNews): String {
+        val body = n.plainText()
+        return if (body.isEmpty() || body.startsWith(n.title)) n.title else n.title + "\n" + body.take(700)
     }
 
     private fun minutesOfDay(hhmm: String): Int? =
@@ -278,68 +339,77 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         val day = "%04d%02d%02d".format(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
         if (state.getBoolean("digest:$day", false)) return
         val dest = settings.digestDestination.split("|", limit = 2).takeIf { it.size == 2 }
-        val lines = if (dest != null) {
+        val rows = if (dest != null) {
             JourneySearch.direct(StationRef(sid, sname), StationRef(dest[0], dest[1]), Date()).sortedBy { it.departure }.take(5).map { j ->
                 val l = j.legs.single()
-                buildString {
-                    append("${hm(l.departure)} ${l.title}")
-                    j.platform?.takeIf { it.isNotBlank() }?.let { append(" · bin. $it") }
-                    when {
-                        j.cancelled -> append(" · SOPPRESSO")
-                        (j.delay ?: 0) > 0 -> append(" · +${j.delay} min")
-                    }
+                val bin = j.platform?.takeIf { it.isNotBlank() }?.let { "bin. $it" }
+                when {
+                    j.cancelled -> NotificationCard.Row(hm(l.departure), l.title, "soppresso", bad = true, gone = true)
+                    (j.delay ?: 0) > 0 -> NotificationCard.Row(hm(l.departure), l.title, "+${j.delay}'", bad = true)
+                    else -> NotificationCard.Row(hm(l.departure), l.title, bin)
                 }
             }
         } else {
             ViaggiaTrenoApi.departures(sid).take(6).map { e ->
-                buildString {
-                    append("${hm(e.orarioPartenza)} ${e.title} → ${e.destinazione.orEmpty()}")
-                    platformLabel(e.binarioEffettivoPartenzaDescrizione ?: e.binarioProgrammatoPartenzaDescrizione)?.takeIf { it.isNotBlank() }?.let { append(" · bin. $it") }
-                    when {
-                        e.provvedimento == 1 -> append(" · SOPPRESSO")
-                        (e.ritardo ?: 0) > 0 && e.nonPartito != true -> append(" · +${e.ritardo} min")
-                    }
+                val bin = platformLabel(e.binarioEffettivoPartenzaDescrizione ?: e.binarioProgrammatoPartenzaDescrizione)?.takeIf { it.isNotBlank() }?.let { "bin. $it" }
+                when {
+                    e.provvedimento == 1 -> NotificationCard.Row(hm(e.orarioPartenza), e.title, "soppresso", bad = true, gone = true)
+                    (e.ritardo ?: 0) > 0 && e.nonPartito != true -> NotificationCard.Row(hm(e.orarioPartenza), e.title, "+${e.ritardo}'", bad = true)
+                    else -> NotificationCard.Row(hm(e.orarioPartenza), e.title, bin)
                 }
             }
         }
-        if (lines.isEmpty()) return
+        if (rows.isEmpty()) return
         state.edit().putBoolean("digest:$day", true).apply()
+        val title = "Da ${TrainBanner.pretty(sname)}" + (dest?.let { " per ${TrainBanner.pretty(it[1])}" } ?: "")
         Notifier.notify(
-            applicationContext, Notifier.CH_DIGEST, "digest".hashCode(),
-            "Prossimi treni da $sname" + (dest?.let { " per ${it[1]}" } ?: ""),
-            lines.joinToString("\n"),
+            applicationContext, Notifier.CH_DIGEST, "digest".hashCode(), title,
+            rows.joinToString("\n") { listOfNotNull(it.time, it.name, it.tag).joinToString(" ") },
+            hero = TrainAlerts.digest(title, rows),
         )
     }
 
     /** Località dei viaggi dell'utente: prima parola del nome delle stazioni (es. "PADOVA", "CASTELFRANCO"). */
     private fun userPlaces(): Set<String> {
+        val fromLines = Graph.favorites.lines.value.flatMap { it.places }.toSet()
+        if (!settings.disruptions) return fromLines     // solo linee preferite
         val names = Graph.subscriptions.items.value.flatMap { listOf(it.fromName, it.toName) } +
             Graph.favorites.stations.value.map { it.name } +
             Graph.favorites.trains.value.flatMap { t ->
                 // etichetta "FR 9600 MILANO CENTRALE → TORINO PORTA NUOVA": si toglie la sigla del treno
                 t.label.split("→").mapIndexed { i, part -> if (i == 0) part.trim().split(" ").drop(2).joinToString(" ") else part.trim() }
             }
-        return names.map { DetectionLocator.normalize(it).split(" ").firstOrNull().orEmpty() }
-            .filter { it.length >= 4 }.toSet()
+        return names.mapNotNull { placeKey(it) }.toSet() + fromLines
     }
 
     /** Avvisi di circolazione che citano le località dei tuoi viaggi. */
     private suspend fun checkDisruptions() {
         val places = userPlaces()
         if (places.isEmpty()) return
-        ViaggiaTrenoApi.infomobility(works = false)
+        alertsFor(ViaggiaTrenoApi.infomobility(works = false), places)
             .filter { categorize(it, false) == InfoCategory.CIRCULATION }
             .filter { n -> !n.title.lowercase().contains("regolare") }
-            .filter { n ->
-                val words = DetectionLocator.normalize(n.title + " " + android.text.Html.fromHtml(n.html, 0)).split(" ").toSet()
-                places.any { it in words }
-            }
             .take(3)
             .forEach { n ->
                 if (once("disr:${n.title.hashCode()}")) {
-                    Notifier.notify(applicationContext, Notifier.CH_DISRUPTIONS, n.title.hashCode(), "Disagi sulla tua linea", n.title, Notifier.EXTRA_INFO to "1")
+                    Notifier.notify(applicationContext, Notifier.CH_DISRUPTIONS, n.title.hashCode(), "Disagi sulla tua linea", fullText(n), Notifier.EXTRA_INFO to "1", TrainAlerts.disruption(n))
                 }
             }
+    }
+
+    /** Avvisi dei monitor RFI delle stazioni preferite (esclusi quelli fissi di sicurezza), una volta sola ciascuno. */
+    private suspend fun checkStationNotices() {
+        for (st in Graph.favorites.stations.value.take(8)) {
+            val notices = RfiMonitor.notices(applicationContext, st.name).orEmpty().filterNot { RfiMonitor.isStanding(it) }
+            for (text in notices.take(2)) {
+                val key = "stn:${st.id}:${text.hashCode()}"
+                if (!once(key)) continue
+                Notifier.notify(
+                    applicationContext, Notifier.CH_STATIONS, key.hashCode(), TrainBanner.pretty(st.name), text,
+                    hero = TrainAlerts.stationNotice(st.name, text),
+                )
+            }
+        }
     }
 
     /** Treni compatibili con gli abbonamenti attivi intorno agli orari abituali: ritardi e soppressioni. */
@@ -358,17 +428,26 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
                     val l = j.legs.single()
                     val key = "subtr:${l.number}:${l.dateMs}"
                     val extra = Notifier.EXTRA_TRAIN to "${l.number}|${l.originId}|${l.dateMs}"
-                    val route = "${l.from} → ${l.to}, partenza ${hm(l.departure)}"
+                    val route = "${TrainBanner.pretty(l.from)} → ${TrainBanner.pretty(l.to)}, partenza ${hm(l.departure)}"
+                    // l'andamento completo serve solo per il banner, quando c'è davvero da avvisare
+                    suspend fun status() = if (l.originId == null || l.dateMs == null) null
+                        else runCatching { ViaggiaTrenoApi.trainStatus(l.originId, l.number, l.dateMs) }.getOrNull()
                     if (j.cancelled) {
-                        if (once("$key:cancel")) Notifier.notify(applicationContext, Notifier.CH_SUBS, key.hashCode(), "${l.title} soppresso", route, extra)
+                        if (once("$key:cancel")) {
+                            val a = status()
+                            Notifier.notify(applicationContext, Notifier.CH_SUBS, key.hashCode(), "${l.title} soppresso", route, extra,
+                                a?.let { TrainAlerts.cancelled(it, l.departure) })
+                        }
                         continue
                     }
                     val delay = j.delay ?: continue
                     val last = state.getInt("$key:delay", Int.MIN_VALUE)
                     if (delay >= settings.delayThreshold && (last == Int.MIN_VALUE || delay - last >= 5)) {
                         state.edit().putInt("$key:delay", delay).apply()
+                        val a = status()
                         Notifier.notify(applicationContext, Notifier.CH_SUBS, key.hashCode(), "${l.title}: +$delay min",
-                            route + (j.platform?.let { " · binario $it" } ?: ""), extra)
+                            route + (j.platform?.let { " · binario $it" } ?: ""), extra,
+                            a?.let { TrainAlerts.delay(it, l.to) }, follow = true)
                     }
                 }
             }
@@ -385,6 +464,7 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
                     if (days == 0) "L'abbonamento scade oggi" else "L'abbonamento scade tra $days ${if (days == 1) "giorno" else "giorni"}",
                     "${s.name.ifEmpty { "${s.fromName} – ${s.toName}" }} · valido fino al ${s.validTo}",
                     Notifier.EXTRA_SUBSCRIPTION to s.id,
+                    TrainAlerts.expiry(s.name.ifEmpty { "${TrainBanner.pretty(s.fromName)} – ${TrainBanner.pretty(s.toName)}" }, days, s.validTo),
                 )
             }
         }

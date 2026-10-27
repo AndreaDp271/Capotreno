@@ -1,0 +1,5 @@
+Redesigned notifications: every alert is a card with the key data up front (delay, platform change, reminder, stop alarm, strikes, disruptions).
+One heart on a train: basic alerts, a trip banner with the "Followed train" widget, and an alert before a chosen stop.
+Frequent trips: an alert before departure for trains from A to B on chosen days and time window.
+Station and line alerts: with the heart you get RFI monitor notices and circulation disruptions.
+The train map now zooms to the route.

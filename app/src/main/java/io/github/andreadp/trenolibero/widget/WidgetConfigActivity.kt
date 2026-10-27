@@ -93,7 +93,7 @@ private fun Section(text: String) {
         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp))
 }
 
-/** Treni preferiti e treni dei biglietti dei prossimi giorni. */
+/** Treno seguito, treni preferiti e treni dei biglietti dei prossimi giorni. */
 @Composable
 private fun TrainPicker(onPick: (String) -> Unit) {
     val favs by Graph.favorites.trains.collectAsState()
@@ -103,6 +103,14 @@ private fun TrainPicker(onPick: (String) -> Unit) {
         .flatMap { t -> t.trains.map { tr -> Triple(tr, t, t.dateMs) } }
     PickerScaffold("Quale treno?") {
         LazyColumn {
+            item {
+                ListItem(
+                    headlineContent = { Text("Treno seguito") },
+                    supportingContent = { Text("Il treno che segui in notifica, cambia da solo quando ne segui un altro") },
+                    modifier = Modifier.clickable { onPick(io.github.andreadp.trenolibero.data.LiveTrain.WIDGET_SELECTION) },
+                )
+                HorizontalDivider()
+            }
             if (favs.isEmpty() && ticketTrains.isEmpty()) {
                 item { Hint("Non hai treni preferiti né biglietti in programma. Nell'app apri un treno e tocca il cuore per aggiungerlo ai preferiti, poi aggiungi di nuovo il widget.") }
             }

@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -71,6 +72,9 @@ class Nav(private val c: NavHostController) {
     fun notificationSettings() = c.navigate("settings/notifications")
 
     fun widgetSettings() = c.navigate("settings/widgets")
+
+    /** Scheda Info (infomobilità), come toccandola nella barra. */
+    fun info() = c.switchTab("info")
 }
 
 /** Passa a una scheda della barra conservando lo stato delle altre schede. */
@@ -97,6 +101,11 @@ private val tabs = listOf(
  */
 @Composable
 fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}, pendingRoute: String? = null, onRouteHandled: () -> Unit = {}) {
+    val guide by io.github.andreadp.trenolibero.data.AppSettings.guide.collectAsState()
+    if (guide) {
+        Onboarding { io.github.andreadp.trenolibero.data.AppSettings.showGuide(false) }
+        return
+    }
     val controller = rememberNavController()
     val startTab = remember {
         io.github.andreadp.trenolibero.data.AppSettings.startTab.takeIf { s -> tabs.any { it.route == s } } ?: "home"

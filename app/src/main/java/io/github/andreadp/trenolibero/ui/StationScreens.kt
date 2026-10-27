@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -54,6 +56,9 @@ import io.github.andreadp.trenolibero.data.BoardEntry
 import io.github.andreadp.trenolibero.data.Graph
 import io.github.andreadp.trenolibero.data.StationRef
 import io.github.andreadp.trenolibero.data.ViaggiaTrenoApi
+import io.github.andreadp.trenolibero.data.plainText
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import java.util.Calendar
 import java.util.Date
@@ -138,10 +143,25 @@ fun StationBoardScreen(nav: Nav, stationId: String, stationName: String) {
     var timeMs by rememberSaveable { mutableStateOf<Long?>(null) } // null = adesso
     val favStations by Graph.favorites.stations.collectAsState()
     val ctx = LocalContext.current
+    val notifPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { }
 
     val state = rememberLoader(stationId, tab, timeMs, refreshMs = if (timeMs == null) 60_000 else null) {
         val t = timeMs?.let { Date(it) } ?: Date()
         if (tab == 0) ViaggiaTrenoApi.departures(stationId, t) else ViaggiaTrenoApi.arrivals(stationId, t)
+    }
+    // avvisi dei monitor RFI della stazione, più quelli di infomobilità che citano la località
+    val alerts = rememberLoader(stationName, refreshMs = 5 * 60_000) {
+        coroutineScope {
+            val monitor = async { runCatching { io.github.andreadp.trenolibero.data.RfiMonitor.notices(ctx, stationName) }.getOrNull().orEmpty() }
+            val n = async { runCatching { ViaggiaTrenoApi.infomobility(works = false) }.getOrDefault(emptyList()) }
+            val w = async { runCatching { ViaggiaTrenoApi.infomobility(works = true) }.getOrDefault(emptyList()) }
+            val news = io.github.andreadp.trenolibero.data.alertsFor(
+                n.await() + w.await(), setOfNotNull(io.github.andreadp.trenolibero.data.placeKey(stationName)),
+            ).filter { !it.title.lowercase().contains("regolare") }.distinctBy { it.title }
+            monitor.await() to news
+        }
     }
 
     fun pickTime() {
@@ -181,7 +201,14 @@ fun StationBoardScreen(nav: Nav, stationId: String, stationName: String) {
                 },
                 actions = {
                     val fav = favStations.any { it.id == stationId }
-                    IconButton(onClick = { Graph.favorites.toggleStation(StationRef(stationId, stationName)) }) {
+                    IconButton(onClick = {
+                        Graph.favorites.toggleStation(StationRef(stationId, stationName))
+                        io.github.andreadp.trenolibero.data.Notifier.createChannels(ctx)
+                        io.github.andreadp.trenolibero.data.Notifier.schedule(ctx)
+                        if (!fav && !io.github.andreadp.trenolibero.data.Notifier.canNotify(ctx) && android.os.Build.VERSION.SDK_INT >= 33) {
+                            notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }) {
                         Icon(if (fav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Preferito")
                     }
                     IconButton(onClick = { nav.map(stationId) }) { Icon(Icons.Default.Place, "Mostra sulla mappa") }
@@ -211,6 +238,12 @@ fun StationBoardScreen(nav: Nav, stationId: String, stationName: String) {
                 )
                 if (timeMs != null) AssistChip(onClick = { timeMs = null }, label = { Text("Adesso") })
             }
+            alerts.data?.let { (all, news) ->
+                // gli avvisi fissi di sicurezza da soli non fanno comparire il riquadro
+                val (standing, notices) = all.partition { io.github.andreadp.trenolibero.data.RfiMonitor.isStanding(it) }
+                if (notices.isNotEmpty() || news.isNotEmpty()) StationAlerts(nav, stationName, notices, standing, news)
+                else standing.firstOrNull()?.let { StandingNotice(it) }
+            }
             if (state.loading && state.data != null) LinearProgressIndicator(Modifier.fillMaxWidth())
             LoadedContent(state) { list ->
                 if (list.isEmpty()) {
@@ -224,6 +257,89 @@ fun StationBoardScreen(nav: Nav, stationId: String, stationName: String) {
                             HorizontalDivider()
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/** Avviso fisso di sicurezza del monitor RFI ("vietato attraversare i binari…"): in evidenza discreta, non come disagio. */
+@Composable
+private fun StandingNotice(text: String) {
+    androidx.compose.material3.Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text.lowercase().replaceFirstChar { it.uppercase() },
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 10.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Avvisi della stazione (monitor RFI) e di infomobilità che citano la località:
+ * chiusi mostrano il primo avviso e quanti sono, aperti tutto il testo.
+ */
+@Composable
+private fun StationAlerts(
+    nav: Nav, stationName: String, notices: List<String>, standing: List<String>, news: List<io.github.andreadp.trenolibero.data.InfoNews>,
+) {
+    var open by rememberSaveable(stationName) { mutableStateOf(false) }
+    val place = io.github.andreadp.trenolibero.data.TrainBanner.pretty(
+        io.github.andreadp.trenolibero.data.placeKey(stationName) ?: stationName,
+    )
+    val count = notices.size + news.size
+    androidx.compose.material3.Card(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    ) {
+        Column(Modifier.clickable { open = !open }.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                Text(
+                    if (count == 1) "1 avviso per $place" else "$count avvisi per $place",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(start = 8.dp).weight(1f),
+                )
+                Text(if (open) "Chiudi" else "Mostra", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onErrorContainer)
+            }
+            // l'avviso della stazione si legge subito, come sul tabellone
+            if (!open) notices.firstOrNull()?.let {
+                Text(it.lowercase().replaceFirstChar { c -> c.uppercase() }, style = MaterialTheme.typography.bodySmall, maxLines = 2,
+                    overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(top = 6.dp))
+            }
+            if (open) {
+                if (notices.isNotEmpty()) {
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
+                    Text("Avvisi della stazione (RFI)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                    notices.forEach {
+                        Text(it.lowercase().replaceFirstChar { c -> c.uppercase() }, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+                standing.forEach {
+                    Text(it.lowercase().replaceFirstChar { c -> c.uppercase() }, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.6f), modifier = Modifier.padding(top = 4.dp))
+                }
+                news.take(5).forEach { n ->
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
+                    Text(n.title, style = MaterialTheme.typography.bodyMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onErrorContainer)
+                    if (n.date.isNotBlank()) Text(n.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                    n.plainText().takeIf { it.isNotEmpty() && it != n.title }?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 6, overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(top = 2.dp))
+                    }
+                }
+                androidx.compose.material3.TextButton(onClick = { nav.info() }, modifier = Modifier.align(Alignment.End)) {
+                    Text("Tutta l'infomobilità")
                 }
             }
         }

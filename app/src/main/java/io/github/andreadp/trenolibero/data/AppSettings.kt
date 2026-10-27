@@ -31,9 +31,19 @@ object AppSettings {
     private val _portrait = MutableStateFlow(true)
     val portrait: StateFlow<Boolean> = _portrait
 
+    /** Guida introduttiva: visibile al primo avvio e quando la si riapre da Opzioni. */
+    private val _guide = MutableStateFlow(false)
+    val guide: StateFlow<Boolean> = _guide
+
+    fun showGuide(v: Boolean) {
+        _guide.value = v
+        if (!v) prefs.edit().putBoolean("guide_done", true).apply()
+    }
+
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        _guide.value = !prefs.getBoolean("guide_done", false)
         _theme.value = enumOr(prefs.getString("theme", null), Theme.SYSTEM)
         // prima della 2.4 c'era solo l'interruttore dei colori dinamici
         val legacy = if (prefs.getBoolean("dynamic_color", true)) Palette.DYNAMIC else Palette.CLASSIC
@@ -91,7 +101,7 @@ object AppSettings {
  */
 object Backup {
     private const val MARKER = "capotreno-backup.txt"
-    private val prefsFiles = listOf("favorites", "notify", "alarms", "app_settings")
+    private val prefsFiles = listOf("favorites", "notify", "alarms", "app_settings", "frequent")
 
     private fun dataDir(ctx: Context) = File(ctx.applicationInfo.dataDir)
 

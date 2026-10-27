@@ -1,0 +1,5 @@
+Notifiche rifatte: ogni avviso ha una card con colori e dati in evidenza (ritardo, cambio binario, promemoria, sveglia, scioperi, disagi).
+Cuoricino unico sul treno: avvisi di base, banner di tutto il viaggio con widget "Treno seguito" e avviso prima di una fermata.
+Viaggi frequenti: avviso prima della partenza dei treni da A a B nei giorni e nella fascia oraria scelti.
+Avvisi di stazione e linee preferite: con il cuoricino arrivano gli avvisi dei monitor RFI e i disagi di circolazione.
+La mappa del treno ora zooma sul percorso.

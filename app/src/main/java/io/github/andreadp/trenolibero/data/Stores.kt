@@ -67,6 +67,32 @@ class Favorites(context: Context) {
     private val _stations = MutableStateFlow(readStations())
     val stations: StateFlow<List<StationRef>> = _stations
 
+    /** Linea (tratta) della mappa salvata con il cuoricino: avvisi di circolazione sulle sue località. */
+    data class Line(val region: Int, val ab: Int, val ba: Int, val name: String) {
+        val id get() = "$region|$ab|$ba"
+        /** Località della linea per cercarla negli avvisi: i due capi del nome ("Padova - Venezia"). */
+        val places: Set<String> get() = name.split(Regex("[-–—→>/]")).mapNotNull { placeKey(it.trim()) }.toSet()
+    }
+
+    private val _lines = MutableStateFlow(readLines())
+    val lines: StateFlow<List<Line>> = _lines
+
+    private fun readLines() = prefs.getStringSet("lines", emptySet())!!.mapNotNull {
+        val p = it.split("|", limit = 4)
+        val r = p.getOrNull(0)?.toIntOrNull(); val a = p.getOrNull(1)?.toIntOrNull(); val b = p.getOrNull(2)?.toIntOrNull()
+        if (r != null && a != null && b != null && p.size == 4) Line(r, a, b, p[3]) else null
+    }.sortedBy { it.name }
+
+    fun isLineFav(region: Int, ab: Int, ba: Int) = _lines.value.any { it.id == "$region|$ab|$ba" }
+
+    fun toggleLine(l: Line) {
+        val set = prefs.getStringSet("lines", emptySet())!!.toMutableSet()
+        val existing = set.firstOrNull { it.startsWith("${l.id}|") }
+        if (existing != null) set.remove(existing) else set.add("${l.id}|${l.name}")
+        prefs.edit().putStringSet("lines", set).apply()
+        _lines.value = readLines()
+    }
+
     private fun readTrains() = prefs.getStringSet("trains", emptySet())!!.mapNotNull {
         val p = it.split("|", limit = 3)
         if (p.size == 3) Train(p[0], p[1], p[2]) else null

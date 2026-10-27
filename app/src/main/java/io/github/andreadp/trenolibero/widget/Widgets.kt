@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -194,11 +195,11 @@ class TrainWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         Graph.init(context)
         val wid = widgetId(context, id)
-        val initial = WidgetPrefs.selection(context, wid)?.let { loadCached(context, wid) { loadTrain(it) } }
+        val initial = WidgetPrefs.selection(context, wid)?.let { loadCached(context, wid) { loadTrain(context, it) } }
         provideContent {
             // ricaricato a ogni aggiornamento (↻, inverti, aggiornamento periodico), anche a sessione aperta
             val state = rememberWidgetData(initial) {
-                WidgetPrefs.selection(context, wid)?.let { s -> loadCached(context, wid) { loadTrain(s) } }
+                WidgetPrefs.selection(context, wid)?.let { s -> loadCached(context, wid) { loadTrain(context, s) } }
             }
             val sel = WidgetPrefs.selection(context, wid)
             Card {
@@ -532,6 +533,21 @@ object Widgets {
         listOf(TrainWidget(), DeparturesWidget(), SubscriptionWidget(), TicketWidget(), InfoWidget()).forEach { w ->
             manager.getGlanceIds(w.javaClass).forEach { id -> runCatching { refresh(ctx, id, w) } }
         }
+    }
+
+    /** Ridisegna solo i widget Treno impostati sul treno seguito (a ogni aggiornamento della sua notifica). */
+    suspend fun refreshLive(ctx: Context) {
+        val manager = GlanceAppWidgetManager(ctx)
+        manager.getGlanceIds(TrainWidget::class.java).forEach { id ->
+            if (WidgetPrefs.selection(ctx, manager.getAppWidgetId(id)) == io.github.andreadp.trenolibero.data.LiveTrain.WIDGET_SELECTION) {
+                runCatching { refresh(ctx, id, TrainWidget()) }
+            }
+        }
+    }
+
+    /** Come [refreshLive], da chi non è in una coroutine (pulsanti della notifica, interfaccia). */
+    fun refreshLiveSoon(ctx: Context) {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch { runCatching { refreshLive(ctx.applicationContext) } }
     }
 
     /** Aggiornamento ogni 15 minuti (minimo consentito da Android) finché c'è almeno un widget. */

@@ -50,6 +50,7 @@ fun NotificationSettingsScreen(nav: Nav) {
     var digestTime by remember { mutableStateOf(settings.digestTime) }
     var digestWeekdays by remember { mutableStateOf(settings.digestWeekdays) }
     var disruptions by remember { mutableStateOf(settings.disruptions) }
+    var stationNotices by remember { mutableStateOf(settings.stationNotices) }
     var subTrains by remember { mutableStateOf(settings.subscriptionTrains) }
     var threshold by remember { mutableFloatStateOf(settings.delayThreshold.toFloat()) }
     var reminder by remember { mutableFloatStateOf(settings.reminderMinutes.toFloat()) }
@@ -103,6 +104,9 @@ fun NotificationSettingsScreen(nav: Nav) {
             SettingSwitch("Disagi sulle tue linee", "Guasti e rallentamenti che riguardano le località di abbonamenti, stazioni e treni preferiti", disruptions) {
                 toggle(it) { v -> settings.disruptions = v; disruptions = v }
             }
+            SettingSwitch("Avvisi delle stazioni preferite", "Gli avvisi dei monitor RFI delle stazioni con il cuoricino, tranne quelli fissi di sicurezza", stationNotices) {
+                toggle(it) { v -> settings.stationNotices = v; stationNotices = v }
+            }
             SettingSwitch("Riepilogo partenze", "Ogni giorno all'orario scelto, i prossimi treni dalla tua stazione", digest) {
                 toggle(it) { v -> settings.digest = v; digest = v }
             }
@@ -134,6 +138,8 @@ fun NotificationSettingsScreen(nav: Nav) {
                 }
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            FrequentTripsSection()
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
             SectionTitle("Avvisa per ritardi da ${threshold.toInt()} minuti")
             Slider(
                 value = threshold, onValueChange = { threshold = it }, valueRange = 1f..30f, steps = 28,
@@ -151,7 +157,7 @@ fun NotificationSettingsScreen(nav: Nav) {
             Text(
                 "I controlli avvengono sul telefono circa ogni 15 minuti, solo con connessione e solo se hai attivato " +
                     "almeno una notifica (nessun server esterno). Android può ritardarli in risparmio energetico.\n\n" +
-                    "La sveglia prima della fermata si imposta dalla schermata del treno (icona della campanella).",
+                    "La sveglia prima della fermata si imposta dalla schermata del treno (cuoricino).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),

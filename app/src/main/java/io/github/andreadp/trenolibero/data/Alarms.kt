@@ -78,7 +78,8 @@ class AlarmWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
         val stop = a.fermate.firstOrNull { it.id == alarm.stopId }
         if (a.cancelled || stop == null || stop.suppressed) {
             Notifier.notify(ctx, Notifier.CH_ALARMS, id, "${a.title}: fermata non servita",
-                "Il treno non fermerà a ${alarm.stopName}" + if (a.cancelled) " (treno soppresso)" else "", extra)
+                "Il treno non fermerà a ${alarm.stopName}" + if (a.cancelled) " (treno soppresso)" else "", extra,
+                TrainAlerts.notServed(a, alarm.stopName))
             StopAlarms.cancel(ctx, alarm); return Result.success()
         }
         val scheduled = stop.arrivoTeorico ?: stop.programmata ?: run { StopAlarms.cancel(ctx, alarm); return Result.success() }
@@ -94,7 +95,7 @@ class AlarmWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
                 ctx, Notifier.CH_ALARMS, id,
                 if (stop.arrivoReale != null) "Sei arrivato a ${alarm.stopName}" else "Tra $minutes min arrivi a ${alarm.stopName}",
                 "${a.title} · arrivo previsto ${hhmm(expected)}$platform" + if (delayMin > 0) " (+$delayMin min)" else "",
-                extra,
+                extra, TrainAlerts.alarm(a, stop, minutes, arrived = stop.arrivoReale != null),
             )
             StopAlarms.cancel(ctx, alarm)
         } else {

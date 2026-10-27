@@ -27,6 +27,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
+import io.github.andreadp.trenolibero.data.Favorites
+import io.github.andreadp.trenolibero.data.Graph
+import io.github.andreadp.trenolibero.data.Notifier
 import io.github.andreadp.trenolibero.data.TrenoTratta
 import io.github.andreadp.trenolibero.data.ViaggiaTrenoApi
 
@@ -35,6 +43,12 @@ import io.github.andreadp.trenolibero.data.ViaggiaTrenoApi
 @Composable
 fun LineScreen(nav: Nav, region: Int, ab: Int, ba: Int) {
     val state = rememberLoader(region, ab, ba, refreshMs = 60_000) { ViaggiaTrenoApi.lineTrains(region, ab, ba) }
+    val ctx = LocalContext.current
+    val favLines by Graph.favorites.lines.collectAsState()
+    val fav = favLines.any { it.id == "$region|$ab|$ba" }
+    val notifPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -42,7 +56,19 @@ fun LineScreen(nav: Nav, region: Int, ab: Int, ba: Int) {
                 navigationIcon = {
                     IconButton(onClick = { nav.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro") }
                 },
-                actions = { IconButton(onClick = state.reload) { Icon(Icons.Default.Refresh, "Aggiorna") } },
+                actions = {
+                    state.data?.firstOrNull()?.tratta?.takeIf { it.isNotBlank() }?.let { name ->
+                        IconButton(onClick = {
+                            Graph.favorites.toggleLine(Favorites.Line(region, ab, ba, name))
+                            Notifier.createChannels(ctx)
+                            Notifier.schedule(ctx)
+                            if (!fav && !Notifier.canNotify(ctx) && android.os.Build.VERSION.SDK_INT >= 33) {
+                                notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }) { Icon(if (fav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Linea preferita: avvisi di circolazione") }
+                    }
+                    IconButton(onClick = state.reload) { Icon(Icons.Default.Refresh, "Aggiorna") }
+                },
             )
         },
     ) { pad ->

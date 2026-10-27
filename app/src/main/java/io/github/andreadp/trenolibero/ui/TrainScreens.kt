@@ -42,6 +42,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -82,7 +83,7 @@ fun TrainSearchScreen(nav: Nav) {
     var loading by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val favTrains by Graph.favorites.trains.collectAsState()
-    val favStations by Graph.favorites.stations.collectAsState()
+    val favLines by Graph.favorites.lines.collectAsState()
 
     fun search() {
         val q = query.trim()
@@ -153,22 +154,23 @@ fun TrainSearchScreen(nav: Nav) {
                     )
                 }
             }
-            if (favStations.isNotEmpty()) {
-                item { SectionTitle("Stazioni preferite") }
-                items(favStations) { s ->
+            if (favLines.isNotEmpty()) {
+                item { SectionTitle("Linee preferite") }
+                items(favLines) { l ->
                     ListItem(
-                        headlineContent = { Text(s.name) },
-                        leadingContent = { Icon(Icons.Default.Place, null, tint = MaterialTheme.colorScheme.primary) },
-                        modifier = Modifier.clickable { nav.station(s.id, s.name) },
+                        headlineContent = { Text(l.name) },
+                        supportingContent = { Text("Avvisi di circolazione") },
+                        leadingContent = { Icon(Icons.Default.Favorite, null, tint = MaterialTheme.colorScheme.primary) },
+                        modifier = Modifier.clickable { nav.line(l.region, l.ab, l.ba) },
                     )
                 }
             }
-            if (favTrains.isEmpty() && favStations.isEmpty() && results == null && error == null) {
+            if (favTrains.isEmpty() && favLines.isEmpty() && results == null && error == null) {
                 item {
                     EmptyText(
                         "Inserisci il numero del treno per vederne l'andamento in tempo reale: " +
                             "fermate, ritardi, binari e ultimo rilevamento.\n\n" +
-                            "Tocca il cuore per aggiungere treni e stazioni ai preferiti."
+                            "Tocca il cuore per aggiungere treni, stazioni e linee ai preferiti."
                     )
                 }
             }
@@ -223,6 +225,14 @@ fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
     val notifPermission = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
     ) { }
+    fun askNotifications() {
+        if (!io.github.andreadp.trenolibero.data.Notifier.canNotify(ctx) && android.os.Build.VERSION.SDK_INT >= 33) {
+            notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    var heartSheet by remember { mutableStateOf(false) }
+    val liveTrain by io.github.andreadp.trenolibero.data.LiveTrain.followedFlow.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) { io.github.andreadp.trenolibero.data.LiveTrain.all(ctx) }
     var alarmTick by remember { mutableStateOf(0) }
     val alarm = remember(loaded?.first, alarmTick) {
         loaded?.first?.let { m -> io.github.andreadp.trenolibero.data.StopAlarms.forTrain(ctx, m.number, m.originId, m.dateMs) }
@@ -243,19 +253,29 @@ fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
                 actions = {
                     if (loaded != null) {
                         val (m, a) = loaded
+                        val value = "${m.number}|${m.originId}|${m.dateMs}"
                         val fav = favTrains.any { it.number == m.number && it.originId == m.originId }
+                        val following = value in liveTrain       // banner attivo: cuore rosso
+                        val active = fav || following || alarm != null
                         IconButton(onClick = {
-                            Graph.favorites.toggleTrain(
-                                Favorites.Train(m.number, m.originId, "${a.title} ${a.origine.orEmpty()} → ${a.destinazione.orEmpty()}")
-                            )
+                            if (!fav) {
+                                Graph.favorites.toggleTrain(
+                                    Favorites.Train(m.number, m.originId, "${a.title} ${a.origine.orEmpty()} → ${a.destinazione.orEmpty()}")
+                                )
+                                askNotifications()
+                            }
+                            heartSheet = true
                         }) {
-                            Icon(if (fav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Preferito")
+                            Box {
+                                Icon(
+                                    if (active) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Preferito e avvisi",
+                                    tint = if (following) androidx.compose.ui.graphics.Color(0xFFE53935) else LocalContentColor.current,
+                                )
+                                if (alarm != null) ClockBadge(Modifier.align(Alignment.Center))      // avviso prima di una fermata
+                            }
                         }
                         IconButton(onClick = { nav.trainMap(m.number, m.originId, m.dateMs) }) {
                             Icon(Icons.Default.Place, "Mappa del percorso")
-                        }
-                        IconButton(onClick = { alarmDialog = true }) {
-                            Icon(androidx.compose.material.icons.Icons.Default.Notifications, "Sveglia prima della fermata")
                         }
                     }
                     IconButton(onClick = state.reload) { Icon(Icons.Default.Refresh, "Aggiorna") }
@@ -273,27 +293,57 @@ fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            alarm?.let { al ->
-                androidx.compose.material3.Card(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-                ) {
-                    Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("🔔 Avviso ${al.minutesBefore} min prima di ${al.stopName}", modifier = Modifier.weight(1f))
-                        androidx.compose.material3.TextButton(onClick = {
-                            io.github.andreadp.trenolibero.data.StopAlarms.cancel(ctx, al); alarmTick++
-                        }) { Text("Annulla") }
+            LoadedContent(state) { (_, a) -> TrainDetail(nav, a) }
+            if (heartSheet && loaded != null) {
+                val (m, a) = loaded
+                val value = "${m.number}|${m.originId}|${m.dateMs}"
+                val fav = favTrains.any { it.number == m.number && it.originId == m.originId }
+                val canFollow = a.arrivato != true && !a.cancelled
+                androidx.compose.material3.ModalBottomSheet(onDismissRequest = { heartSheet = false }) {
+                    Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+                        Text("${a.title} · ${a.destinazione.orEmpty()}", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Ricevi gli avvisi di ritardo, cambio binario e soppressione.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+                        )
+                        androidx.compose.material3.ListItem(
+                            headlineContent = { Text("Banner del viaggio") },
+                            supportingContent = { Text("Notifica fissa con la linea delle fermate e il widget") },
+                            trailingContent = {
+                                androidx.compose.material3.Switch(checked = value in liveTrain, enabled = canFollow || value in liveTrain, onCheckedChange = { on ->
+                                    if (on) { io.github.andreadp.trenolibero.data.LiveTrain.start(ctx, value); askNotifications() }
+                                    else io.github.andreadp.trenolibero.data.LiveTrain.stop(ctx, value)
+                                })
+                            },
+                        )
+                        androidx.compose.material3.ListItem(
+                            headlineContent = { Text("Avviso prima di una fermata") },
+                            supportingContent = { Text(alarm?.let { "${it.minutesBefore} min prima di ${it.stopName}" } ?: "Scegli la stazione e l'anticipo") },
+                            trailingContent = {
+                                androidx.compose.material3.Switch(checked = alarm != null, enabled = canFollow || alarm != null, onCheckedChange = { on ->
+                                    if (on) { heartSheet = false; alarmDialog = true }
+                                    else alarm?.let { io.github.andreadp.trenolibero.data.StopAlarms.cancel(ctx, it); alarmTick++ }
+                                })
+                            },
+                        )
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                heartSheet = false
+                                if (fav) Graph.favorites.toggleTrain(Favorites.Train(m.number, m.originId, ""))
+                                if (value in liveTrain) io.github.andreadp.trenolibero.data.LiveTrain.stop(ctx, value)
+                                alarm?.let { io.github.andreadp.trenolibero.data.StopAlarms.cancel(ctx, it); alarmTick++ }
+                            },
+                            modifier = Modifier.align(Alignment.End),
+                        ) { Text("Togli dai preferiti e spegni tutto") }
                     }
                 }
             }
-            LoadedContent(state) { (_, a) -> TrainDetail(nav, a) }
             if (alarmDialog && loaded != null) {
                 AlarmDialog(loaded.first, loaded.second, onDismiss = { alarmDialog = false }) { al ->
                     io.github.andreadp.trenolibero.data.StopAlarms.set(ctx, al)
                     alarmDialog = false; alarmTick++
-                    if (!io.github.andreadp.trenolibero.data.Notifier.canNotify(ctx) && android.os.Build.VERSION.SDK_INT >= 33) {
-                        notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                    }
+                    askNotifications()
                 }
             }
         }
@@ -341,3 +391,16 @@ private fun AlarmDialog(m: TrainMatch, a: Andamento, onDismiss: () -> Unit, onSe
     )
 }
 
+
+/** Orologino disegnato dentro il cuoricino: c'è un banner o un avviso attivo per questo treno. */
+@Composable
+private fun ClockBadge(modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.surface
+    androidx.compose.foundation.Canvas(modifier.size(11.dp)) {
+        val c = center
+        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        drawCircle(color, radius = size.minDimension / 2 - 0.7.dp.toPx(), style = stroke)
+        drawLine(color, c, androidx.compose.ui.geometry.Offset(c.x, c.y - size.height * 0.3f), strokeWidth = stroke.width, cap = stroke.cap)
+        drawLine(color, c, androidx.compose.ui.geometry.Offset(c.x + size.width * 0.22f, c.y), strokeWidth = stroke.width, cap = stroke.cap)
+    }
+}

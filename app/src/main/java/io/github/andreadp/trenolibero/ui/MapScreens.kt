@@ -2,6 +2,7 @@ package io.github.andreadp.trenolibero.ui
 
 import android.graphics.Paint
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -123,12 +124,27 @@ private fun rememberMapView(): MapView {
 
 @Composable
 private fun OsmAttribution(modifier: Modifier) {
-    Text(
-        "© OpenStreetMap contributors",
-        style = MaterialTheme.typography.labelSmall,
-        color = Color.Black,
-        modifier = modifier.background(Color.White.copy(alpha = 0.8f)).padding(horizontal = 6.dp, vertical = 2.dp),
-    )
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    androidx.compose.material3.Surface(
+        modifier = modifier.padding(8.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+        tonalElevation = 2.dp,
+        shadowElevation = 3.dp,
+        onClick = { runCatching { uri.openUri("https://www.openstreetmap.org/copyright") } },
+    ) {
+        Row(
+            Modifier.padding(start = 8.dp, end = 10.dp, top = 5.dp, bottom = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                "ⓘ © OpenStreetMap",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 // ---------------- Mappa stazioni + linee ----------------
@@ -529,10 +545,10 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
             MapControls(map, Modifier.align(Alignment.CenterEnd).padding(end = 12.dp))
             val data = state.data
             val segments = route.data
+            var zoomed by remember { mutableStateOf(false) }
             LaunchedEffect(data, segments) {
                 if (data == null) return@LaunchedEffect
                 val (a, stops, detections) = data
-                val firstDraw = map.overlays.isEmpty()
                 // la posizione dell'utente resta
                 map.overlays.removeAll { it !is org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay }
                 // tocco sulla mappa vuota: chiude la scheda
@@ -633,14 +649,17 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
                         setOnMarkerClickListener { _, _ -> sel = TrainMapSel.Detection(i); true }
                     })
                 }
-                if (firstDraw && pts.isNotEmpty()) {
-                    map.post {
+                if (!zoomed && pts.isNotEmpty()) {
+                    zoomed = true
+                    val fit = {
                         if (pts.size == 1) {
                             map.controller.setZoom(12.0); map.controller.setCenter(pts[0])
                         } else {
-                            map.zoomToBoundingBox(BoundingBox.fromGeoPoints(pts).increaseByScale(1.2f), false)
+                            map.zoomToBoundingBox(BoundingBox.fromGeoPoints(pts).increaseByScale(1.3f), false)
                         }
                     }
+                    // osmdroid non richiama il listener se la mappa è già disposta
+                    if (map.isLayoutOccurred) fit() else map.addOnFirstLayoutListener { _, _, _, _, _ -> fit() }
                 }
                 map.invalidate()
             }
