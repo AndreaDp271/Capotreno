@@ -70,7 +70,7 @@ class Favorites(context: Context) {
     /** Linea (tratta) della mappa salvata con il cuoricino: avvisi di circolazione sulle sue località. */
     data class Line(val region: Int, val ab: Int, val ba: Int, val name: String) {
         val id get() = "$region|$ab|$ba"
-        /** Località della linea per cercarla negli avvisi: i due capi del nome ("Padova - Venezia"). */
+        /** Località della linea per cercarla negli avvisi: i due capi del nome ("Roma - Napoli"). */
         val places: Set<String> get() = name.split(Regex("[-–—→>/]")).mapNotNull { placeKey(it.trim()) }.toSet()
     }
 

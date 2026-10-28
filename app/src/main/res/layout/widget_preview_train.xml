@@ -12,9 +12,9 @@
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
             android:orientation="vertical" android:layout_marginStart="8dp">
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="REG 17293" android:textColor="#FFFFFFFF" android:textSize="14sp" android:textStyle="bold" android:maxLines="1" />
+                android:text="FR 9615" android:textColor="#FFFFFFFF" android:textSize="14sp" android:textStyle="bold" android:maxLines="1" />
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="BELLUNO → PADOVA" android:textColor="#DDFFFFFF" android:textSize="11sp" android:maxLines="1" />
+                android:text="MILANO CENTRALE → ROMA TERMINI" android:textColor="#DDFFFFFF" android:textSize="11sp" android:maxLines="1" />
         </LinearLayout>
         <ImageView android:layout_width="18dp" android:layout_height="18dp"
             android:src="@drawable/ic_widget_refresh" android:tint="#FFFFFFFF" />
@@ -23,7 +23,7 @@
         android:orientation="vertical" android:padding="12dp">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
             <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:text="In viaggio verso Feltre" android:textColor="@color/widget_fg" android:textSize="14sp" android:textStyle="bold" />
+                android:text="In viaggio verso Bologna" android:textColor="@color/widget_fg" android:textSize="14sp" android:textStyle="bold" />
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="+4\'" android:textColor="#FFFFFFFF" android:textSize="11sp" android:textStyle="bold"
                 android:background="@drawable/widget_preview_chip" android:backgroundTint="#FFC62828"
@@ -38,7 +38,7 @@
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="Prossima fermata" android:textColor="@color/widget_muted" android:textSize="11sp" />
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="FELTRE · 11:39" android:textColor="@color/widget_fg" android:textSize="13sp" />
+                    android:text="BOLOGNA C.LE · 11:39" android:textColor="@color/widget_fg" android:textSize="13sp" />
             </LinearLayout>
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="Bin. 2" android:textColor="#FFFFD54F" android:textSize="11sp" android:textStyle="bold"

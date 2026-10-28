@@ -38,7 +38,7 @@
                 android:background="@drawable/widget_preview_chip" android:backgroundTint="#FFFF8F00"
                 android:paddingStart="6dp" android:paddingEnd="6dp" android:layout_marginEnd="4dp" />
             <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="4dp"
-                android:text="Rallentamenti tra Padova e Vicenza per un guasto" android:textColor="@color/widget_fg" android:textSize="12sp" android:maxLines="2" />
+                android:text="Rallentamenti tra Bologna e Firenze per un guasto" android:textColor="@color/widget_fg" android:textSize="12sp" android:maxLines="2" />
         </LinearLayout>
         <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/widget_line" />
     </LinearLayout>

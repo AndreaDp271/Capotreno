@@ -369,7 +369,7 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         )
     }
 
-    /** Località dei viaggi dell'utente: prima parola del nome delle stazioni (es. "PADOVA", "CASTELFRANCO"). */
+    /** Località dei viaggi dell'utente: prima parola del nome delle stazioni (es. "ROMA", "MILANO"). */
     private fun userPlaces(): Set<String> {
         val fromLines = Graph.favorites.lines.value.flatMap { it.places }.toSet()
         if (!settings.disruptions) return fromLines     // solo linee preferite

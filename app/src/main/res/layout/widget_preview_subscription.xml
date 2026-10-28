@@ -12,7 +12,7 @@
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
             android:orientation="vertical" android:layout_marginStart="8dp">
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="CASTELFRANCO V. → PADOVA" android:textColor="#FFFFFFFF" android:textSize="14sp" android:textStyle="bold" android:maxLines="1" />
+                android:text="MONZA → MILANO C.LE" android:textColor="#FFFFFFFF" android:textSize="14sp" android:textStyle="bold" android:maxLines="1" />
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="Abbonamento" android:textColor="#DDFFFFFF" android:textSize="11sp" android:maxLines="1" />
         </LinearLayout>
@@ -29,7 +29,7 @@
                 android:orientation="vertical" android:layout_marginStart="8dp">
                 <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="REG 5732" android:textColor="#FFFFFFFF" android:textSize="10sp" android:textStyle="bold"
+                android:text="REG 2412" android:textColor="#FFFFFFFF" android:textSize="10sp" android:textStyle="bold"
                 android:background="@drawable/widget_preview_chip" android:backgroundTint="#FF2E7D32"
                 android:paddingStart="6dp" android:paddingEnd="6dp" android:layout_marginEnd="4dp" /><TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="+3\'" android:textColor="#FFFFFFFF" android:textSize="10sp" android:textStyle="bold"
@@ -51,7 +51,7 @@
                 android:orientation="vertical" android:layout_marginStart="8dp">
                 <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="REG 5736" android:textColor="#FFFFFFFF" android:textSize="10sp" android:textStyle="bold"
+                android:text="REG 2416" android:textColor="#FFFFFFFF" android:textSize="10sp" android:textStyle="bold"
                 android:background="@drawable/widget_preview_chip" android:backgroundTint="#FF2E7D32"
                 android:paddingStart="6dp" android:paddingEnd="6dp" android:layout_marginEnd="4dp" /><TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="in orario" android:textColor="#FFFFFFFF" android:textSize="10sp" android:textStyle="bold"
@@ -73,7 +73,7 @@
                 android:orientation="vertical" android:layout_marginStart="8dp">
                 <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="REG 5740" android:textColor="#FFFFFFFF" android:textSize="10sp" android:textStyle="bold"
+                android:text="REG 2420" android:textColor="#FFFFFFFF" android:textSize="10sp" android:textStyle="bold"
                 android:background="@drawable/widget_preview_chip" android:backgroundTint="#FF2E7D32"
                 android:paddingStart="6dp" android:paddingEnd="6dp" android:layout_marginEnd="4dp" /><TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="in orario" android:textColor="#FFFFFFFF" android:textSize="10sp" android:textStyle="bold"

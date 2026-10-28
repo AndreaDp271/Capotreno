@@ -153,7 +153,7 @@ private val GENERIC_PLACE_WORDS = setOf(
 )
 
 /**
- * Località di una stazione per cercarla negli avvisi: la prima parola del nome ("PADOVA", "CASTELFRANCO"), se abbastanza lunga;
+ * Località di una stazione per cercarla negli avvisi: la prima parola del nome ("ROMA", "MILANO"), se abbastanza lunga;
  * se è una parola comune nei toponimi ("CASTELLO", "SAN"…) tutto il nome ("CASTELLO DI GODEGO").
  */
 fun placeKey(stationName: String): String? {
