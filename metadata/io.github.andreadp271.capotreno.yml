@@ -1,7 +1,7 @@
 AntiFeatures:
   NonFreeNet:
-    it: Usa le API non libere di viaggiatreno.it (RFI) e lefrecce.it (Trenitalia).
-    en-US: Uses the non-free viaggiatreno.it (RFI) and lefrecce.it (Trenitalia) APIs.
+    it: Usa le API non libere di viaggiatreno.it (RFI), i monitor di stazione RFI (iechub.rfi.it) e lefrecce.it (Trenitalia).
+    en-US: Uses the non-free viaggiatreno.it (RFI), RFI station monitor (iechub.rfi.it) and lefrecce.it (Trenitalia) APIs.
 Categories:
   - Public Transport
 License: GPL-3.0-or-later
@@ -16,9 +16,9 @@ Repo: https://github.com/AndreaDp271/Capotreno.git
 Binaries: https://github.com/AndreaDp271/Capotreno/releases/download/v%v/Capotreno-%v.apk
 
 Builds:
-  - versionName: 2.5.0
-    versionCode: 34
-    commit: e3794b9f9dfa00e2aa9bf4c40a89979520b3d423
+  - versionName: 2.5.1
+    versionCode: 35
+    commit: 451a94a189d49d4ed6124fc6c32168db6c339731
     subdir: app
     gradle:
       - yes
@@ -35,5 +35,5 @@ MaintainerNotes: |-
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 2.5.0
-CurrentVersionCode: 34
+CurrentVersion: 2.5.1
+CurrentVersionCode: 35
