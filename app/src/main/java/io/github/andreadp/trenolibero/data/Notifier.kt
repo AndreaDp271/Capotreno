@@ -88,6 +88,7 @@ class NotifySettings(context: Context) {
  * con quello già notificato. Nessun servizio push esterno.
  */
 object Notifier {
+    private val NL = 10.toChar().toString()
     const val CH_TRAINS = "treni"
     const val CH_TICKETS = "biglietti"
     const val CH_STRIKES = "scioperi"
@@ -179,8 +180,15 @@ object Notifier {
         hero: NotificationCard.Hero? = null, follow: Boolean = false,
     ) {
         if (!canNotify(ctx)) return
-        fun plain() = builder(ctx, channel, id, extra).setContentTitle(title).setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        // Con la card, titolo e testo li vede solo l'orologio (Garmin e simili mostrano solo quelli): dato che conta in testa al titolo, dettaglio sotto
+        val lead = hero?.let { h ->
+            h.side?.takeIf { it.kind == NotificationCard.SideKind.SIGN || it.kind == NotificationCard.SideKind.CHANGED }?.let { "Bin. ${it.num}" }
+                ?: h.big.toString().takeIf { it.isNotBlank() && it.length <= 14 }
+        }
+        val shownTitle = if (lead != null && !title.startsWith(lead)) "$lead · $title" else title
+        val shownText = hero?.det?.toString()?.takeIf { it.isNotBlank() && it !in text }?.let { text + NL + it } ?: text
+        fun plain() = builder(ctx, channel, id, extra).setContentTitle(shownTitle).setContentText(shownText.substringBefore(NL))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(shownText))
         val nm = NotificationManagerCompat.from(ctx)
         if (hero != null) {
             val card = runCatching {
@@ -264,6 +272,7 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         val now = System.currentTimeMillis()
         for (fav in Graph.favorites.trains.value) {
             val (m, a) = runCatching { resolveTrainData(fav.number, fav.originId, null) }.getOrNull() ?: continue
+            if (LiveTrain.all(applicationContext).any { it.startsWith(fav.number + "|") }) continue     // seguito col banner: gli avvisi li manda già lui
             val dep = a.orarioPartenza ?: continue
             val arr = a.orarioArrivo ?: dep
             if (now < dep - 60 * 60_000L || now > arr + 15 * 60_000L) continue

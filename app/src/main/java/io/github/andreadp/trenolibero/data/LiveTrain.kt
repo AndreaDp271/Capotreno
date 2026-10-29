@@ -124,6 +124,38 @@ object LiveTrain {
         }
     }
 
+    /**
+     * Il banner fisso non arriva sugli smartwatch (le notifiche in corso non vengono inoltrate): per i momenti che contano
+     * ci sono avvisi normali, una sola volta per evento. Per i preferiti seguiti col banner, il controllo periodico li salta.
+     */
+    fun alerts(ctx: Context, value: String, a: Andamento) {
+        val st = ctx.getSharedPreferences("live_alerts", Context.MODE_PRIVATE)
+        fun once(k: String) = !st.getBoolean("$value:$k", false).also { if (!it) st.edit().putBoolean("$value:$k", true).apply() }
+        val id = notificationId(value) + 7
+        val extra = Notifier.EXTRA_TRAIN to value
+        val route = "${TrainBanner.pretty(a.origine.orEmpty())} → ${TrainBanner.pretty(a.destinazione.orEmpty())}"
+        fun send(i: Int, title: String, text: String, hero: NotificationCard.Hero) =
+            Notifier.notify(ctx, Notifier.CH_TRAINS, id + i, title, text, extra, hero)
+        when {
+            a.cancelled -> { if (once("cancel")) send(0, "${a.title} soppresso", route, TrainAlerts.cancelled(a)); return }
+            a.arrivato == true -> { if (once("arrived")) send(0, "${a.title} è arrivato", "${TrainBanner.pretty(a.destinazione.orEmpty())} alle ${TrainBanner.hm(a.orarioArrivo)}", TrainAlerts.arrived(a)); return }
+        }
+        if (a.nonPartito == false && once("departed") && System.currentTimeMillis() - (a.orarioPartenza ?: 0L) < 15 * 60_000L) send(0, "${a.title} è partito", route, TrainAlerts.departed(a))
+        val delay = a.ritardo ?: 0
+        val last = st.getInt("$value:delay", 0)
+        if (a.nonPartito != true && kotlin.math.abs(delay - last) >= 5) {
+            st.edit().putInt("$value:delay", delay).apply()
+            send(1, "${a.title}: ${if (delay > 0) "+$delay" else delay} min", route, TrainAlerts.delay(a))
+        }
+        val stop = a.fermate.getOrNull(TrainBanner.Progress(a).next)
+        val prog = platformLabel(stop?.binarioProgrammatoPartenzaDescrizione).orEmpty()
+        val eff = platformLabel(stop?.binarioEffettivoPartenzaDescrizione).orEmpty()
+        if (eff.isNotEmpty() && prog.isNotEmpty() && eff != prog && once("platform:${stop?.stazione}:$eff")) {
+            send(2, "${a.title}: cambio binario", "A ${TrainBanner.pretty(stop?.stazione.orEmpty())} parte dal binario $eff (era $prog)",
+                TrainAlerts.platformChange(a, stop, prog, eff))
+        }
+    }
+
     /** Testo della notifica espansa: stato, ultimo rilevamento, motivo del ritardo. */
     private fun detail(a: Andamento): String = listOfNotNull(
         TrainBanner.status(a),
@@ -158,6 +190,7 @@ class LiveTrainWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
         if (a == null) return 2 * 60_000L
         val ended = a.arrivato == true || a.cancelled
         LiveTrain.post(ctx, value, a, ended)
+        runCatching { LiveTrain.alerts(ctx, value, a) }
         if (ended) { LiveTrain.stop(ctx, value, keepNotification = true); return null }
         val untilDeparture = (a.orarioPartenza ?: now) - now
         return when {

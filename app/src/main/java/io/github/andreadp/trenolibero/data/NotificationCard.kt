@@ -179,6 +179,16 @@ object TrainAlerts {
         platform(stop, arrival = true),
     )
 
+    fun departed(a: Andamento) = NotificationCard.Hero(
+        NotificationCard.State.MOVING, route(a), "In viaggio",
+        (a.orarioPartenza)?.let { "Partito alle ${TrainBanner.hm(it)}" } ?: "",
+    )
+
+    fun arrived(a: Andamento) = NotificationCard.Hero(
+        NotificationCard.State.DIGEST, route(a), "Arrivato",
+        "${pretty(a.destinazione)} · ${TrainBanner.hm(a.orarioArrivo)}",
+    )
+
     fun notServed(a: Andamento, stopName: String) = NotificationCard.Hero(
         NotificationCard.State.CANCELLED, a.title, "Non ferma", "A ${pretty(stopName)}",
     )
