@@ -1,7 +1,9 @@
 AntiFeatures:
   NonFreeNet:
-    it: Usa le API non libere di viaggiatreno.it (RFI), i monitor di stazione RFI (iechub.rfi.it) e lefrecce.it (Trenitalia).
-    en-US: Uses the non-free viaggiatreno.it (RFI), RFI station monitor (iechub.rfi.it) and lefrecce.it (Trenitalia) APIs.
+    it: Usa le API non libere di viaggiatreno.it (RFI), i monitor di stazione RFI
+      (iechub.rfi.it) e lefrecce.it (Trenitalia).
+    en-US: Uses the non-free viaggiatreno.it (RFI), RFI station monitor (iechub.rfi.it)
+      and lefrecce.it (Trenitalia) APIs.
 Categories:
   - Public Transport
 License: GPL-3.0-or-later
