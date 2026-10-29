@@ -1,0 +1,4 @@
+Guida introduttiva al primo avvio, con i permessi, e voce Lingua nelle Opzioni.
+Notifiche più leggibili su smartwatch (Garmin e simili): il dato che conta è in testa al titolo.
+Treno seguito: avvisi normali per partenza, ritardo, cambio binario, arrivo e soppressione, utili anche sull'orologio.
+Anteprime dei widget con stazioni grandi. Dichiarata nei testi la fonte dei monitor RFI.

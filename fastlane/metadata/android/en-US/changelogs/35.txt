@@ -1,0 +1,4 @@
+First-run guide with permissions, and a Language entry in Options.
+More readable notifications on smartwatches (Garmin and similar): the key data leads the title.
+Followed train: regular alerts for departure, delay, platform change, arrival and cancellation, also shown on the watch.
+Widget previews use major stations. RFI station monitors are now declared as a data source.

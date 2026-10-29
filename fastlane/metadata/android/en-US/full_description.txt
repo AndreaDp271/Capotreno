@@ -25,5 +25,5 @@
 <li>camera: ticket code scanning;</li>
 <li>notifications: the alerts above.</li>
 </ul>
-<p><b>Network</b>: data comes from viaggiatreno.it (RFI) and lefrecce.it (Trenitalia), which are not free software (NonFreeNet anti-feature), and map tiles come from OpenStreetMap. viaggiatreno.it only works over plain HTTP; cleartext traffic is allowed for that domain only.</p>
+<p><b>Network</b>: data comes from viaggiatreno.it (RFI), the public RFI station monitors (iechub.rfi.it, for station notices) and lefrecce.it (Trenitalia), which are not free software (NonFreeNet anti-feature), and map tiles come from OpenStreetMap. viaggiatreno.it only works over plain HTTP; cleartext traffic is allowed for that domain only.</p>
 <p>Not affiliated with or endorsed by Trenitalia, RFI or FS Group.</p>

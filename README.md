@@ -76,6 +76,9 @@ Note: il server risponde solo in HTTP (l'HTTPS fa redirect), quindi il traffico 
 è abilitato esclusivamente per `viaggiatreno.it` in `network_security_config.xml`.
 Il CDN rifiuta le richieste senza User-Agent da browser.
 
+Gli avvisi delle stazioni preferite e il tabellone leggono anche i monitor pubblici RFI
+(`https://iechub.rfi.it/ArriviPartenze/ArrivalsDepartures/…`, in HTTPS).
+
 L'API può cambiare senza preavviso. Su F-Droid l'app porta l'anti-feature **NonFreeNet**.
 
 ## Pubblicazione su F-Droid
@@ -92,7 +95,7 @@ Descrizioni e changelog per lo store sono in `fastlane/metadata/android/`.
 
 ## Permessi
 
-- `INTERNET`: dati ViaggiaTreno e mappe OSM
+- `INTERNET`: dati ViaggiaTreno, monitor RFI (iechub.rfi.it) e mappe OSM
 - `ACCESS_FINE/COARSE_LOCATION` (facoltativi, chiesti solo all'uso): stazioni vicine, posizione sulle mappe,
   stazione di partenza suggerita; la posizione non lascia il dispositivo
 - `POST_NOTIFICATIONS` (facoltativo, chiesto quando attivi una notifica)

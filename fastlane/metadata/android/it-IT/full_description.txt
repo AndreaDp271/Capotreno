@@ -24,5 +24,5 @@
 <li>fotocamera: scansione del codice del biglietto;</li>
 <li>notifiche: gli avvisi descritti sopra.</li>
 </ul>
-<p><b>Rete</b>: i dati vengono da viaggiatreno.it (RFI) e lefrecce.it (Trenitalia), servizi non liberi (anti-feature NonFreeNet), e le mappe da OpenStreetMap. viaggiatreno.it funziona solo in HTTP, quindi il traffico in chiaro è permesso solo verso quel dominio.</p>
+<p><b>Rete</b>: i dati vengono da viaggiatreno.it (RFI), dai monitor pubblici di stazione RFI (iechub.rfi.it, per gli avvisi delle stazioni) e da lefrecce.it (Trenitalia), servizi non liberi (anti-feature NonFreeNet), e le mappe da OpenStreetMap. viaggiatreno.it funziona solo in HTTP, quindi il traffico in chiaro è permesso solo verso quel dominio.</p>
 <p>App non affiliata né approvata da Trenitalia, RFI o Gruppo FS.</p>
