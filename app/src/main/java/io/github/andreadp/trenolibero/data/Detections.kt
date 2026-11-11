@@ -19,7 +19,38 @@ enum class Precision {
     ESTIMATED,
 }
 
-data class LocatedDetection(val detection: Detection, val lat: Double, val lon: Double, val precision: Precision)
+/**
+ * [leg]/[frac]: per le posizioni stimate, il tratto tra due fermate con coordinate note (indice della fermata di
+ * partenza tra quelle note) e la frazione già percorsa, così la mappa può collocarla lungo i binari:
+ * [lat]/[lon] sono sulla retta tra le due fermate, che su tratte lunghe può passare lontano dalla linea.
+ */
+data class LocatedDetection(
+    val detection: Detection,
+    val lat: Double,
+    val lon: Double,
+    val precision: Precision,
+    val leg: Int = -1,
+    val frac: Double = 0.0,
+)
+
+/** Punto alla frazione [frac] (0..1) della lunghezza di una polilinea. */
+fun pointAlong(points: List<LatLon>, frac: Double): LatLon? {
+    if (points.isEmpty()) return null
+    if (points.size == 1) return points[0]
+    val seg = (0 until points.size - 1).map { i ->
+        DetectionLocator.distanceKm(points[i].lat, points[i].lon, points[i + 1].lat, points[i + 1].lon)
+    }
+    var left = seg.sum() * frac.coerceIn(0.0, 1.0)
+    for (i in seg.indices) {
+        if (left <= seg[i] || i == seg.lastIndex) {
+            val t = if (seg[i] == 0.0) 0.0 else (left / seg[i]).coerceIn(0.0, 1.0)
+            val a = points[i]; val b = points[i + 1]
+            return LatLon(a.lat + (b.lat - a.lat) * t, a.lon + (b.lon - a.lon) * t)
+        }
+        left -= seg[i]
+    }
+    return points.last()
+}
 
 /** Rilevamenti visti durante la sessione, per treno (l'API restituisce solo l'ultimo). */
 object DetectionHistory {
@@ -98,41 +129,59 @@ object DetectionLocator {
         index: Collection<StationGeo>,
     ): LocatedDetection? {
         val n = normalize(d.name)
-        // 1) fermata del treno
-        stops.firstOrNull { normalize(it.first.stazione) == n }?.second?.let {
-            return LocatedDetection(d, it.lat, it.lon, Precision.EXACT)
-        }
-        // 2) stazione di transito presente in anagrafica
-        index.firstOrNull { normalize(it.name) == n }?.let { return LocatedDetection(d, it.lat, it.lon, Precision.EXACT) }
 
-        // Tratta in cui si trova il treno all'ora del rilevamento
+        // Tratta in cui si trovava il treno all'ora del rilevamento: [leg] è l'indice della fermata appena lasciata
+        // tra quelle con coordinate note (-1 se non c'è un tratto, es. prima della partenza o dopo l'arrivo)
         val located = stops.filter { it.second != null }
         val prevIdx = located.indexOfLast { (f, _) -> (f.partenzaReale ?: f.arrivoReale ?: Long.MAX_VALUE) <= d.time }
         val prev = located.getOrNull(prevIdx)
         val next = located.getOrNull(prevIdx + 1)
+        val leg = if (prev != null && next != null) prevIdx else -1
+        // frazione oraria del tratto già percorsa, per la stima quando il luogo non è noto
+        val frac = if (prev != null && next != null) {
+            val from = prev.first.partenzaReale ?: prev.first.arrivoReale ?: d.time
+            val delayMs = (a.ritardo ?: 0) * 60_000L
+            val to = (next.first.arrivoTeorico ?: next.first.programmata)?.plus(delayMs)
+            if (to != null && to > from) ((d.time - from).toDouble() / (to - from)).coerceIn(0.1, 0.9) else 0.5
+        } else 0.0
+        fun at(lat: Double, lon: Double, p: Precision) = LocatedDetection(d, lat, lon, p, leg, frac)
+
+        // 1) fermata del treno
+        stops.firstOrNull { normalize(it.first.stazione) == n }?.second?.let { return at(it.lat, it.lon, Precision.EXACT) }
+        // 2) stazione di transito presente in anagrafica (con più omonime, la più vicina alla tratta)
+        index.filter { normalize(it.name) == n }
+            .minByOrNull { c -> distanceToLeg(c, prev?.second, next?.second, located) }
+            ?.let { return at(it.lat, it.lon, Precision.EXACT) }
 
         // 3) posto tecnico che porta il nome di una località vicina alla tratta
         val place = placeName(d.name)
         if (place.length >= 3) {
-            val candidates = index.filter {
-                val sn = normalize(it.name)
-                sn == place || sn.startsWith("$place ") || sn.split(" ").firstOrNull() == place.split(" ").first() && place.length >= 5
-            }
-            val refs = listOfNotNull(prev?.second, next?.second).ifEmpty { located.mapNotNull { it.second } }
-            val best = candidates.minByOrNull { c -> refs.minOfOrNull { distanceKm(c.lat, c.lon, it.lat, it.lon) } ?: 0.0 }
-            if (best != null) {
-                val dist = refs.minOfOrNull { distanceKm(best.lat, best.lon, it.lat, it.lon) } ?: 0.0
-                if (dist < 60) return LocatedDetection(d, best.lat, best.lon, Precision.NEAR)
+            fun strong(sn: String) = sn == place || sn.startsWith("$place ")
+            // solo la prima parola in comune ("PC ROMA SMISTAMENTO" -> stazioni "ROMA …"): indizio debole, usato
+            // solo se manca un nome corrispondente; altrimenti finirebbe sulla fermata appena lasciata
+            fun weak(sn: String) = place.length >= 5 && sn.split(" ").firstOrNull() == place.split(" ").first()
+            val strongOnes = index.filter { strong(normalize(it.name)) }
+            val candidates = strongOnes.ifEmpty { index.filter { weak(normalize(it.name)) } }
+            // la più vicina al tratto (non alle due fermate, che tirerebbe il punto verso di esse)
+            val best = candidates.minByOrNull { c -> distanceToLeg(c, prev?.second, next?.second, located) }
+            if (best != null && distanceToLeg(best, prev?.second, next?.second, located) < 30) {
+                return at(best.lat, best.lon, Precision.NEAR)
             }
         }
 
-        // 4) stima per interpolazione oraria tra le due fermate
-        val p = prev?.second ?: return next?.second?.let { LocatedDetection(d, it.lat, it.lon, Precision.ESTIMATED) }
-        val nx = next?.second ?: return LocatedDetection(d, p.lat, p.lon, Precision.ESTIMATED)
-        val from = prev.first.partenzaReale ?: prev.first.arrivoReale ?: d.time
-        val delayMs = (a.ritardo ?: 0) * 60_000L
-        val to = (next.first.arrivoTeorico ?: next.first.programmata)?.plus(delayMs)
-        val frac = if (to != null && to > from) ((d.time - from).toDouble() / (to - from)).coerceIn(0.1, 0.9) else 0.5
-        return LocatedDetection(d, p.lat + (nx.lat - p.lat) * frac, p.lon + (nx.lon - p.lon) * frac, Precision.ESTIMATED)
+        // 4) stima per interpolazione oraria tra le due fermate (la mappa la riporta lungo i binari del tratto)
+        val p = prev?.second ?: return next?.second?.let { at(it.lat, it.lon, Precision.ESTIMATED) }
+        val nx = next?.second ?: return at(p.lat, p.lon, Precision.ESTIMATED)
+        return at(p.lat + (nx.lat - p.lat) * frac, p.lon + (nx.lon - p.lon) * frac, Precision.ESTIMATED)
+    }
+
+    /** Distanza (km) di una stazione dal tratto tra due fermate; senza tratto, dalla fermata nota più vicina. */
+    private fun distanceToLeg(c: StationGeo, a: StationGeo?, b: StationGeo?, all: List<Pair<Fermata, StationGeo?>>): Double {
+        val pts = listOfNotNull(a, b).ifEmpty { all.mapNotNull { it.second } }
+        if (pts.isEmpty()) return 0.0
+        if (pts.size == 1 || a == null || b == null) return pts.minOf { distanceKm(c.lat, c.lon, it.lat, it.lon) }
+        val q = projectOnPolyline(listOf(LatLon(a.lat, a.lon), LatLon(b.lat, b.lon)), LatLon(c.lat, c.lon))?.second
+            ?: return 0.0
+        return distanceKm(c.lat, c.lon, q.lat, q.lon)
     }
 }

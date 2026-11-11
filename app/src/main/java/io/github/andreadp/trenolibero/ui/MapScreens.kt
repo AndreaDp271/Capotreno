@@ -563,6 +563,43 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
                 val legs = (0 until (pts.size - 1).coerceAtLeast(0)).map { i ->
                     segments?.getOrNull(i)?.map { GeoPoint(it.lat, it.lon) } ?: listOf(pts[i], pts[i + 1])
                 }
+                val allRoute = legs.flatten()
+                val allRouteLL = allRoute.map { LatLon(it.latitude, it.longitude) }
+                // Posizione dei rilevamenti come km percorsi lungo il tracciato (i tratti uniti in fila)
+                val legLL = legs.map { l -> l.map { LatLon(it.latitude, it.longitude) } }
+                fun km(p: LatLon, q: LatLon) = DetectionLocator.distanceKm(p.lat, p.lon, q.lat, q.lon)
+                fun len(l: List<LatLon>) = (0 until (l.size - 1).coerceAtLeast(0)).sumOf { km(l[it], l[it + 1]) }
+                val legLen = legLL.map(::len)
+                val legStart = legLen.runningFold(0.0) { acc, x -> acc + x }
+                val total = legStart.last()
+                // km del rilevamento: dentro il tratto in cui il treno si trovava a quell'ora (mai su un tratto già
+                // fatto o non ancora raggiunto); luoghi noti proiettati sui binari del tratto, gli altri stimati dagli orari
+                val chain: List<Double?> = run {
+                    var reached = -1.0
+                    detections.map { ld ->
+                        if (ld.leg !in legLL.indices || total <= 0.0) return@map null
+                        val estimate = legStart[ld.leg] + legLen[ld.leg] * ld.frac
+                        val ch = if (ld.precision == io.github.andreadp.trenolibero.data.Precision.ESTIMATED) estimate
+                        else {
+                            val raw = LatLon(ld.lat, ld.lon)
+                            projectOnPolyline(legLL[ld.leg], raw)?.let { (seg, q) ->
+                                // un luogo lontano dal tratto è un'omonimia: meglio la stima oraria
+                                if (km(q, raw) > 15) null
+                                else legStart[ld.leg] + len(legLL[ld.leg].subList(0, seg + 1)) + km(legLL[ld.leg][seg], q)
+                            } ?: estimate
+                        }
+                        // il treno non torna indietro: mai prima di un rilevamento precedente
+                        maxOf(ch, reached).also { reached = it }
+                    }
+                }
+                // Punto da disegnare per il rilevamento [i], sempre sui binari
+                fun displayPoint(i: Int): LatLon {
+                    chain[i]?.let { ch -> io.github.andreadp.trenolibero.data.pointAlong(allRouteLL, ch / total)?.let { return it } }
+                    val ld = detections[i]
+                    val raw = LatLon(ld.lat, ld.lon)
+                    return projectOnPolyline(allRouteLL, raw)?.second
+                        ?.takeIf { DetectionLocator.distanceKm(it.lat, it.lon, raw.lat, raw.lon) < 15 } ?: raw
+                }
                 // Tre stati: già percorso (pieno), in transito teorico dall'ultimo rilevamento alla prossima fermata
                 // (tratteggiato), ancora da percorrere (grigio)
                 val lastDet = detections.lastOrNull()
@@ -599,7 +636,7 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
                         running && i == lastReachedKnown -> {
                             // tratto in corso: diviso nel punto dell'ultimo rilevamento, se cade al suo interno
                             val proj = lastDet?.takeIf { d -> DetectionLocator.normalize(d.detection.name) != DetectionLocator.normalize(known[lastReachedKnown].first.stazione) }?.let { d ->
-                                projectOnPolyline(leg.map { LatLon(it.latitude, it.longitude) }, LatLon(d.lat, d.lon))
+                                projectOnPolyline(leg.map { LatLon(it.latitude, it.longitude) }, displayPoint(detections.lastIndex))
                             }
                             if (proj == null) {
                                 line(leg, 1)
@@ -625,23 +662,23 @@ fun TrainMapScreen(nav: Nav, number: String, originId: String, dateMs: Long) {
                     })
                 }
                 // Rilevamenti: i precedenti come scia, l'ultimo con l'icona del treno
-                val allRoute = legs.flatten()
                 detections.forEachIndexed { i, ld ->
-                    // sempre sul percorso: le coordinate di stazioni e posti tecnici non cadono sui binari
-                    var p = GeoPoint(ld.lat, ld.lon)
-                    projectOnPolyline(allRoute.map { LatLon(it.latitude, it.longitude) }, LatLon(ld.lat, ld.lon))
-                        ?.second?.takeIf { DetectionLocator.distanceKm(it.lat, it.lon, ld.lat, ld.lon) < 15 }
-                        ?.let { p = GeoPoint(it.lat, it.lon) }
+                    val p = displayPoint(i).let { GeoPoint(it.lat, it.lon) }
                     val last = i == detections.lastIndex
                     map.overlays.add(Marker(map).apply {
                         position = p
                         icon = if (last) {
-                            // direzione di marcia: lungo il percorso a partire dal punto del rilevamento
-                            val from = allRoute.indices.minByOrNull {
-                                DetectionLocator.distanceKm(allRoute[it].latitude, allRoute[it].longitude, p.latitude, p.longitude)
+                            // direzione di marcia: verso il punto 1,5 km più avanti lungo il percorso (non dal vertice
+                            // più vicino, che su un tracciato con piccoli rientri può girare la freccia al contrario)
+                            val ch = chain[i]
+                            val bearing = when {
+                                a.arrivato == true -> null
+                                ch != null -> io.github.andreadp.trenolibero.data.pointAlong(allRouteLL, ((ch + 1.5) / total).coerceAtMost(1.0))
+                                    ?.let { ahead -> TrainMarker.bearingAlong(listOf(LatLon(p.latitude, p.longitude), ahead)) }
+                                else -> allRoute.indices.minByOrNull {
+                                    DetectionLocator.distanceKm(allRoute[it].latitude, allRoute[it].longitude, p.latitude, p.longitude)
+                                }?.let { from -> TrainMarker.bearingAlong(allRouteLL.drop(from)) }
                             }
-                            val bearing = if (a.arrivato == true || from == null) null
-                            else TrainMarker.bearingAlong(allRoute.drop(from).map { LatLon(it.latitude, it.longitude) })
                             TrainMarker.icon(ctx, bearing)
                         } else ContextCompat.getDrawable(ctx, R.drawable.detection_dot)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
