@@ -60,6 +60,9 @@ class Nav(private val c: NavHostController) {
 
     fun ticket(id: String) = c.navigate("ticket/${Uri.encode(id)}")
 
+    /** Scheda Biglietti, come toccandola nella barra. */
+    fun tickets() = c.switchTab("tickets")
+
     /** [attachTo]: id dell'abbonamento a cui allegare il codice scansionato. */
     fun scan(attachTo: String? = null) = c.navigate(if (attachTo == null) "scan" else "scan?attach=${Uri.encode(attachTo)}")
 
@@ -114,7 +117,7 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}, pendingRou
     var importError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(pendingImport) {
         val uri = pendingImport ?: return@LaunchedEffect
-        importTicket(uri).onSuccess { nav.ticket(it.id) }.onFailure { importError = errorMessage(it) }
+        importTicket(uri).onSuccess { nav.openImported(it) }.onFailure { importError = errorMessage(it) }
         onImportHandled()
     }
     val ctx = androidx.compose.ui.platform.LocalContext.current

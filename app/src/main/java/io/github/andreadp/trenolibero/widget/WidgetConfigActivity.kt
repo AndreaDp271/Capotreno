@@ -99,8 +99,9 @@ private fun TrainPicker(onPick: (String) -> Unit) {
     val favs by Graph.favorites.trains.collectAsState()
     val tickets by Graph.tickets.tickets.collectAsState()
     val today = System.currentTimeMillis() - 24 * 3600_000L
-    val ticketTrains = tickets.filter { !it.isSubscription && (it.dateMs ?: 0) >= today }
-        .flatMap { t -> t.trains.map { tr -> Triple(tr, t, t.dateMs) } }
+    val ticketTrains = tickets.filter { !it.isSubscription }
+        .flatMap { t -> t.trains.map { tr -> Triple(tr, t, t.dateMsOf(tr)) } }
+        .filter { (it.third ?: 0) >= today }
     PickerScaffold("Quale treno?") {
         LazyColumn {
             item {

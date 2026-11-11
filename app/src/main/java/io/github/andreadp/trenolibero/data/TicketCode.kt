@@ -42,11 +42,15 @@ object TicketCode {
         DecodeHintType.POSSIBLE_FORMATS to formats,
     )
 
-    /** Rende le pagine del PDF (max [maxPages]) alla larghezza [width] px, su fondo bianco. */
-    fun renderPdf(file: File, width: Int, maxPages: Int = 6): List<Bitmap> =
+    /**
+     * Rende le pagine del PDF alla larghezza [width] px, su fondo bianco: quelle indicate in [pages]
+     * (indici da 0, es. le pagine di un singolo viaggio), altrimenti le prime [maxPages].
+     */
+    fun renderPdf(file: File, width: Int, maxPages: Int = 6, pages: List<Int> = emptyList()): List<Bitmap> =
         ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
             PdfRenderer(fd).use { r ->
-                (0 until min(r.pageCount, maxPages)).map { i ->
+                val wanted = pages.filter { it in 0 until r.pageCount }.ifEmpty { (0 until r.pageCount).toList() }
+                wanted.take(maxPages).map { i ->
                     r.openPage(i).use { p ->
                         val height = (width.toFloat() * p.height / p.width).toInt()
                         Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { b ->
@@ -59,7 +63,7 @@ object TicketCode {
         }
 
     /** Strategia 1: immagini incorporate nelle prime pagine del PDF (richiede PDFBoxResourceLoader.init). */
-    fun fromPdfImages(doc: PDDocument, maxPages: Int = 3): FoundCode? {
+    fun fromPdfImages(doc: PDDocument, maxPages: Int = 3, pages: List<Int> = emptyList()): FoundCode? {
         val images = mutableListOf<Bitmap>()
         fun collect(res: PDResources?, depth: Int) {
             res ?: return
@@ -73,7 +77,8 @@ object TicketCode {
                 }
             }
         }
-        doc.pages.take(maxPages).forEach { collect(it.resources, 0) }
+        val wanted = pages.filter { it in 0 until doc.numberOfPages }.ifEmpty { (0 until doc.numberOfPages).toList() }
+        wanted.take(maxPages).forEach { collect(doc.getPage(it).resources, 0) }
         // prima le immagini più "quadrate" (QR/Aztec), poi le altre
         images.sortBy { kotlin.math.abs(1f - it.width.toFloat() / it.height) }
         for (img in images) {

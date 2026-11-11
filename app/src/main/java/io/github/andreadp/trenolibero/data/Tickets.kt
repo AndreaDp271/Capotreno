@@ -15,8 +15,21 @@ import java.io.File
 import java.util.Calendar
 import java.util.UUID
 
+/**
+ * Treno del biglietto. [date] ("dd/MM/yyyy") è valorizzata solo se diversa da quella del biglietto:
+ * un PDF può contenere più viaggi in giorni diversi (es. andata e ritorno).
+ */
 @Serializable
-data class TicketTrain(val number: String, val category: String = "")
+data class TicketTrain(val number: String, val category: String = "", val date: String = "")
+
+/** Mezzanotte (ora di Roma) di una data "dd/MM/yyyy", come richiesto da andamentoTreno. */
+fun romeMidnight(date: String): Long? {
+    val m = Regex("(\\d{1,2})/(\\d{1,2})/(\\d{4})").matchEntire(date) ?: return null
+    return Calendar.getInstance(ViaggiaTrenoApi.ROME).apply {
+        clear()
+        set(m.groupValues[3].toInt(), m.groupValues[2].toInt() - 1, m.groupValues[1].toInt(), 0, 0, 0)
+    }.timeInMillis
+}
 
 @Serializable
 data class Ticket(
@@ -46,6 +59,12 @@ data class Ticket(
     val isSubscription: Boolean = false,
     val subscriptionType: String = "",
     val operator: String = "",
+    /**
+     * PDF con più viaggi (es. andata e ritorno, cambi con biglietti separati): ogni viaggio è un biglietto a sé
+     * che condivide il file [pdfId] e mostra solo le sue [pages] (indici da 0). Vuoti: PDF proprio, tutte le pagine.
+     */
+    val pdfId: String = "",
+    val pages: List<Int> = emptyList(),
 ) {
     val isImage: Boolean get() = kind == "image"
     val isScan: Boolean get() = kind == "scan"
@@ -59,13 +78,15 @@ data class Ticket(
 
     /** Mezzanotte (ora di Roma) del giorno del viaggio, come richiesto da andamentoTreno. */
     val dateMs: Long?
-        get() {
-            val m = Regex("(\\d{1,2})/(\\d{1,2})/(\\d{4})").matchEntire(date) ?: return null
-            return Calendar.getInstance(ViaggiaTrenoApi.ROME).apply {
-                clear()
-                set(m.groupValues[3].toInt(), m.groupValues[2].toInt() - 1, m.groupValues[1].toInt(), 0, 0, 0)
-            }.timeInMillis
-        }
+        get() = romeMidnight(date)
+
+    /** Data del viaggio di un singolo treno: la sua, se il PDF ne indica una diversa, altrimenti quella del biglietto. */
+    fun dateOf(tr: TicketTrain): String = tr.date.ifEmpty { date }
+    fun dateMsOf(tr: TicketTrain): Long? = romeMidnight(dateOf(tr))
+
+    /** Giorno dell'ultimo viaggio del biglietto (per sapere se è ancora "in programma"). */
+    val lastDateMs: Long?
+        get() = (listOf(dateMs) + trains.map { dateMsOf(it) }).filterNotNull().maxOrNull()
 }
 
 /** Biglietti importati: PDF copiati nello spazio privato dell'app + dati riconosciuti in tickets.json. */
@@ -85,7 +106,8 @@ class TicketStore(private val context: Context) {
         _tickets.value = sorted
     }
 
-    fun pdf(id: String) = File(dir, "$id.pdf")
+    /** PDF del biglietto (condiviso tra i viaggi dello stesso file). */
+    fun pdf(id: String) = File(dir, "${get(id)?.pdfId?.ifEmpty { null } ?: id}.pdf")
     fun image(id: String) = File(dir, "$id.img")
     fun code(id: String) = File(dir, "${id}_code.png")
     fun get(id: String) = _tickets.value.firstOrNull { it.id == id }
@@ -93,37 +115,65 @@ class TicketStore(private val context: Context) {
     fun save(t: Ticket) = write(_tickets.value.filterNot { it.id == t.id } + t)
 
     fun delete(id: String) {
-        pdf(id).delete()
+        val shared = get(id)?.pdfId?.ifEmpty { null }
+        // il PDF condiviso resta finché lo usa un altro viaggio
+        if (shared == null || _tickets.value.none { it.id != id && it.pdfId == shared }) pdf(id).delete()
         image(id).delete()
         code(id).delete()
         write(_tickets.value.filterNot { it.id == id })
     }
 
+    /** Testo di ogni pagina del PDF (richiede PDFBoxResourceLoader.init). */
+    private fun pageTexts(file: File): List<String> = PDDocument.load(file).use { doc ->
+        (1..doc.numberOfPages).map { p -> PDFTextStripper().apply { startPage = p; endPage = p }.getText(doc) }
+    }
+
     /**
      * Importa un PDF o un'immagine: copia il file, cerca il codice a barre da mostrare al controllore
      * e (per i PDF) estrae il testo per riconoscere i dati del viaggio.
+     * Un PDF con più viaggi diventa un biglietto per viaggio (nell'ordine del file), tutti sullo stesso PDF.
      */
-    suspend fun import(uri: Uri, stations: StationIndex): Ticket = withContext(Dispatchers.IO) {
+    suspend fun import(uri: Uri, stations: StationIndex): List<Ticket> = withContext(Dispatchers.IO) {
         val id = UUID.randomUUID().toString()
         val mime = context.contentResolver.getType(uri).orEmpty()
         val head = context.contentResolver.openInputStream(uri)?.use { it.readNBytesCompat(5) }
             ?: throw ApiException("Impossibile leggere il file")
         val isPdf = mime == "application/pdf" || String(head, Charsets.ISO_8859_1) == "%PDF-"
-        val file = if (isPdf) pdf(id) else image(id)
+        val file = if (isPdf) File(dir, "$id.pdf") else image(id)
         context.contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use { input.copyTo(it) } }
             ?: throw ApiException("Impossibile leggere il file")
         val names = runCatching { stations.all().map { it.name } }.getOrDefault(emptyList())
 
-        val (parsed, found) = if (isPdf) {
-            val text = try {
+        if (isPdf) {
+            val texts = try {
                 PDFBoxResourceLoader.init(context.applicationContext)
-                PDDocument.load(file).use { PDFTextStripper().getText(it) }
+                pageTexts(file)
             } catch (e: Exception) {
                 file.delete()
                 throw ApiException("Il file non è un PDF leggibile")
             }
-            TicketParser.parse(text, names) to findPdfCode(file)
-        } else {
+            val trips = TicketParser.splitTrips(texts)
+            val now = System.currentTimeMillis()
+            val tickets = trips.mapIndexed { i, pages ->
+                val multi = trips.size > 1
+                val tid = if (i == 0) id else UUID.randomUUID().toString()
+                val found = findPdfCode(file, if (multi) pages else emptyList())
+                found?.let { f -> code(tid).outputStream().use { f.image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) } }
+                TicketParser.parse(pages.joinToString("\n") { texts[it] }, names).copy(
+                    id = tid,
+                    // a parità di data l'ordine del file resta quello dell'elenco
+                    importedAt = now - i,
+                    hasPdf = true, kind = "pdf",
+                    codeFormat = found?.format.orEmpty(), codeText = found?.text.orEmpty(),
+                    pdfId = if (multi) id else "",
+                    pages = if (multi) pages else emptyList(),
+                )
+            }
+            write(_tickets.value + tickets)
+            return@withContext tickets
+        }
+
+        val (parsed, found) = run {
             val bmp = decodeImage(file) ?: run {
                 file.delete(); throw ApiException("Formato non supportato: usa un PDF o un'immagine (JPG, PNG…)")
             }
@@ -135,23 +185,26 @@ class TicketStore(private val context: Context) {
         val t = parsed.copy(
             id = id,
             importedAt = System.currentTimeMillis(),
-            hasPdf = isPdf,
-            kind = if (isPdf) "pdf" else "image",
+            hasPdf = false,
+            kind = "image",
             codeFormat = found?.format.orEmpty(),
             codeText = found?.text.orEmpty(),
         )
         save(t)
-        t
+        listOf(t)
     }
 
-    /** Codice del biglietto PDF: prima tra le immagini incorporate, poi sulle pagine renderizzate. */
-    private fun findPdfCode(file: File): FoundCode? {
+    /**
+     * Codice del biglietto PDF: prima tra le immagini incorporate, poi sulle pagine renderizzate.
+     * [pages]: solo le pagine di un viaggio (vuoto: le prime pagine del file).
+     */
+    private fun findPdfCode(file: File, pages: List<Int> = emptyList()): FoundCode? {
         runCatching {
             PDFBoxResourceLoader.init(context.applicationContext)
-            PDDocument.load(file).use { TicketCode.fromPdfImages(it) }
+            PDDocument.load(file).use { TicketCode.fromPdfImages(it, pages = pages) }
         }.getOrNull()?.let { return it }
-        val pages = runCatching { TicketCode.renderPdf(file, 2000, maxPages = 3) }.getOrDefault(emptyList())
-        return TicketCode.find(pages)
+        val rendered = runCatching { TicketCode.renderPdf(file, 2000, maxPages = 3, pages = pages) }.getOrDefault(emptyList())
+        return TicketCode.find(rendered)
     }
 
     /**
@@ -172,16 +225,42 @@ class TicketStore(private val context: Context) {
         t
     }
 
-    /** Rilegge i dati dal PDF (es. dopo un aggiornamento del riconoscimento), mantenendo il codice. */
+    /**
+     * Rilegge i dati dal PDF (es. dopo un aggiornamento del riconoscimento), mantenendo il codice.
+     * Un biglietto importato prima della divisione per viaggio, se il PDF ne contiene più d'uno,
+     * viene diviso: questo diventa il primo viaggio e gli altri si aggiungono all'elenco.
+     */
     suspend fun reparse(id: String, stations: StationIndex): Ticket? = withContext(Dispatchers.IO) {
         val t = get(id) ?: return@withContext null
         if (t.kind != "pdf") return@withContext t
         val names = runCatching { stations.all().map { it.name } }.getOrDefault(emptyList())
         PDFBoxResourceLoader.init(context.applicationContext)
-        val text = PDDocument.load(pdf(id)).use { PDFTextStripper().getText(it) }
-        val p = TicketParser.parse(text, names)
-        p.copy(id = t.id, importedAt = t.importedAt, kind = t.kind, codeFormat = t.codeFormat, codeText = t.codeText)
-            .also { save(it) }
+        val file = pdf(id)
+        val texts = pageTexts(file)
+        fun parse(pages: List<Int>) =
+            TicketParser.parse(pages.filter { it in texts.indices }.ifEmpty { texts.indices.toList() }.joinToString("\n") { texts[it] }, names)
+
+        val trips = if (t.pages.isEmpty()) TicketParser.splitTrips(texts) else emptyList()
+        if (trips.size <= 1) {
+            return@withContext parse(t.pages).copy(
+                id = t.id, importedAt = t.importedAt, kind = t.kind, codeFormat = t.codeFormat, codeText = t.codeText,
+                pdfId = t.pdfId, pages = t.pages,
+            ).also { save(it) }
+        }
+        // il file si chiama già come questo biglietto: gli altri viaggi lo condividono
+        val split = trips.mapIndexed { i, pages ->
+            val tid = if (i == 0) t.id else UUID.randomUUID().toString()
+            val found = findPdfCode(file, pages)
+            if (found != null) code(tid).outputStream().use { found.image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            else code(tid).delete()
+            parse(pages).copy(
+                id = tid, importedAt = t.importedAt - i, kind = "pdf",
+                codeFormat = found?.format.orEmpty(), codeText = found?.text.orEmpty(),
+                pdfId = t.id, pages = pages,
+            )
+        }
+        write(_tickets.value.filterNot { it.id == t.id } + split)
+        split.first()
     }
 
     /** Cerca (di nuovo) il codice di un biglietto già importato e lo salva. */
@@ -190,7 +269,7 @@ class TicketStore(private val context: Context) {
         val found = when {
             t.isScan -> return TicketCode.render(t.codeFormat, t.codeText)
             t.isImage -> decodeImage(image(id))?.let { TicketCode.find(it) }
-            else -> findPdfCode(pdf(id))
+            else -> findPdfCode(pdf(id), t.pages)
         }
         found ?: return null
         code(id).outputStream().use { found.image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
@@ -268,6 +347,29 @@ object TicketParser {
         RegexOption.IGNORE_CASE,
     )
 
+    // Identità di un viaggio su una pagina: numero del biglietto e riga "VIAGGIO da … a …" (PDF Trenitalia)
+    private val titleNumberRx = Regex("(?:Numero\\s+Titolo|Codice\\s+Biglietto)\\s*:?\\s*(\\d{6,})", RegexOption.IGNORE_CASE)
+    private val tripLineRx = Regex("VIAGGIO\\s+da\\s+[^\\n]+")
+
+    /**
+     * Divide le pagine di un PDF nei viaggi che contiene (indici da 0). Una pagina senza indizi resta con la
+     * precedente; un PDF senza indizi (Italo, regionali…) è un solo viaggio, come prima.
+     */
+    fun splitTrips(pages: List<String>): List<List<Int>> {
+        val groups = mutableListOf<MutableList<Int>>()
+        var lastKey: String? = null
+        pages.forEachIndexed { i, p ->
+            val key = listOfNotNull(
+                titleNumberRx.find(p)?.groupValues?.get(1),
+                tripLineRx.find(p)?.value?.replace(Regex("\\s+"), " ")?.trim(),
+            ).joinToString("|").ifEmpty { null }
+            if (groups.isEmpty() || (key != null && lastKey != null && key != lastKey)) groups.add(mutableListOf())
+            groups.last().add(i)
+            if (key != null) lastKey = key
+        }
+        return groups.ifEmpty { listOf(mutableListOf()) }
+    }
+
     private fun normDate(raw: String): String? {
         val m = dateRx.find(raw) ?: return null
         val d = m.groupValues[1].toInt(); val mo = m.groupValues[2].toInt()
@@ -327,10 +429,18 @@ object TicketParser {
             ?: ""
         val year = date.takeLast(4)
 
+        // Date dei singoli viaggi ("VIAGGIO … il 11/11/2026", "Ore 17:35 - 11/11/2026"): ogni treno prende
+        // l'ultima che lo precede, così andata e ritorno in giorni diversi hanno ciascuno la propria data
+        val tripDates = (tripRx.findAll(t).mapNotNull { m -> normDate(m.groupValues[1])?.let { m.range.first to it } } +
+            oreDates.mapNotNull { m -> normDate(m.groupValues[2])?.let { m.range.first to it } })
+            .sortedBy { it.first }
+            .toList()
+
         val trains = trainRx.findAll(t)
             .map { m ->
                 val cat = m.groupValues[1].uppercase()
-                TicketTrain(m.groupValues[2], shortCategory[cat] ?: cat)
+                val own = tripDates.lastOrNull { it.first <= m.range.first }?.second
+                TicketTrain(m.groupValues[2], shortCategory[cat] ?: cat, own?.takeIf { it != date }.orEmpty())
             }
             .filter { it.number != year }
             .distinctBy { it.number }
@@ -368,7 +478,9 @@ object TicketParser {
             coach = coachRx.find(t)?.groupValues?.get(1).orEmpty(),
             seat = seatRx.find(t)?.groupValues?.get(1)?.trim().orEmpty(),
             pnr = pnrRx.find(t)?.groupValues?.get(1).orEmpty(),
-            passenger = (passengerBlockRx.find(t) ?: passengerRx.find(t))?.groupValues?.get(1)?.trim().orEmpty(),
+            // biglietti di gruppo: tutti i passeggeri, nell'ordine del PDF
+            passenger = passengerBlockRx.findAll(t).map { it.groupValues[1].trim() }.distinct().joinToString(", ")
+                .ifEmpty { passengerRx.find(t)?.groupValues?.get(1)?.trim().orEmpty() },
         )
     }
 

@@ -286,11 +286,13 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         val now = System.currentTimeMillis()
         val today = SimpleDateFormat("dd/MM/yyyy", Locale.ITALY).apply { timeZone = ViaggiaTrenoApi.ROME }.format(Date(now))
         for (t in Graph.tickets.tickets.value) {
-            if (t.date != today || t.trains.isEmpty()) continue
-            val train = t.trains.first()
-            val (m, a) = runCatching { resolveTrainData(train.number, null, t.dateMs) }.getOrNull() ?: continue
+            // il primo treno che viaggia oggi (un PDF può avere andata e ritorno in giorni diversi)
+            val train = t.trains.firstOrNull { t.dateOf(it) == today } ?: continue
+            val (m, a) = runCatching { resolveTrainData(train.number, null, t.dateMsOf(train)) }.getOrNull() ?: continue
             val stop = a.fermate.firstOrNull { DetectionLocator.normalize(it.stazione) == DetectionLocator.normalize(t.from) }
-                ?: a.fermate.firstOrNull()
+                // la stazione "Da" del biglietto è quella dell'andata: per un ritorno non si indovina la fermata
+                ?: if (train.date.isEmpty()) a.fermate.firstOrNull() else null
+            if (stop == null && train.date.isNotEmpty()) continue
             val dep = stop?.partenzaTeorica ?: a.orarioPartenza ?: continue
             val arr = a.orarioArrivo ?: dep
             val extra = Notifier.EXTRA_TRAIN to "${m.number}|${m.originId}|${m.dateMs}"

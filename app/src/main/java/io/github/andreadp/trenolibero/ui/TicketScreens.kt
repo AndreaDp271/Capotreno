@@ -62,6 +62,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import io.github.andreadp.trenolibero.R
@@ -81,8 +88,16 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Importa un PDF e apre il biglietto; usato sia dal pulsante sia dalla condivisione da altre app. */
-suspend fun importTicket(uri: Uri): Result<Ticket> = runCatching { Graph.tickets.import(uri, Graph.stations) }
+/**
+ * Importa un PDF o un'immagine; usato sia dal pulsante sia dalla condivisione da altre app.
+ * Un PDF con più viaggi restituisce un biglietto per viaggio.
+ */
+suspend fun importTicket(uri: Uri): Result<List<Ticket>> = runCatching { Graph.tickets.import(uri, Graph.stations) }
+
+/** Dopo l'importazione: un solo viaggio si apre subito, più viaggi si vedono nell'elenco dei biglietti. */
+fun Nav.openImported(tickets: List<Ticket>) {
+    if (tickets.size == 1) ticket(tickets[0].id) else tickets()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,7 +117,7 @@ fun TicketsScreen(nav: Nav) {
     val subPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) subScope.launch {
             importing = true; error = null
-            importTicket(uri).onSuccess { t -> draftSub = subscriptionFromTicket(t) }.onFailure { error = errorMessage(it) }
+            importTicket(uri).onSuccess { t -> draftSub = subscriptionFromTicket(t.first()) }.onFailure { error = errorMessage(it) }
             importing = false
         }
     }
@@ -110,7 +125,7 @@ fun TicketsScreen(nav: Nav) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             importing = true; error = null
-            importTicket(uri).onSuccess { nav.ticket(it.id) }.onFailure { error = errorMessage(it) }
+            importTicket(uri).onSuccess { nav.openImported(it) }.onFailure { error = errorMessage(it) }
             importing = false
         }
     }
@@ -250,10 +265,15 @@ fun TicketScreen(nav: Nav, id: String) {
     var editing by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf<Bitmap?>(null) }
+    // pagina del biglietto aperta a schermo intero (indice tra quelle mostrate), ingrandibile
+    var zoomPage by remember { mutableStateOf<Int?>(null) }
+    // rilettura del PDF in corso (con la ricerca dei codici di ogni viaggio richiede qualche secondo)
+    var reparsing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val pages = rememberLoader(id) { withContext(Dispatchers.IO) { ticketPages(id) } }
+    // si ricarica quando cambiano le pagine (es. biglietto diviso per viaggio con ↻)
+    val pages = rememberLoader(id, t?.pages) { withContext(Dispatchers.IO) { ticketPages(id) } }
     // Codice da mostrare al controllore: salvato all'importazione, altrimenti cercato ora
-    val code = rememberLoader(id) {
+    val code = rememberLoader(id, t?.codeText) {
         withContext(Dispatchers.IO) {
             val f = Graph.tickets.code(id)
             if (f.exists()) BitmapFactory.decodeFile(f.path) else Graph.tickets.findCode(id)
@@ -269,7 +289,13 @@ fun TicketScreen(nav: Nav, id: String) {
                 },
                 actions = {
                     if (t?.kind == "pdf") {
-                        IconButton(onClick = { scope.launch { runCatching { Graph.tickets.reparse(id, Graph.stations) } } }) {
+                        IconButton(enabled = !reparsing, onClick = {
+                            scope.launch {
+                                reparsing = true
+                                runCatching { Graph.tickets.reparse(id, Graph.stations) }
+                                reparsing = false
+                            }
+                        }) {
                             Icon(Icons.Default.Refresh, "Rileggi i dati dal PDF")
                         }
                     }
@@ -283,6 +309,12 @@ fun TicketScreen(nav: Nav, id: String) {
             EmptyText("Biglietto non trovato"); return@Scaffold
         }
         LazyColumn(Modifier.padding(pad).fillMaxSize()) {
+            if (reparsing) item {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text("Rilettura del PDF e ricerca dei codici…", style = MaterialTheme.typography.bodySmall)
+                    LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 4.dp))
+                }
+            }
             item { CodeSection(code, t, onShow = { fullscreen = it }, fallback = pages.data?.firstOrNull()) }
             item {
                 Card(
@@ -294,7 +326,8 @@ fun TicketScreen(nav: Nav, id: String) {
                         Field("Data", t.date)
                         Field("Orario", listOf(t.departure, t.arrival).filter { it.isNotEmpty() }.joinToString(" – "))
                         Field("Carrozza", t.coach); Field("Posto", t.seat)
-                        Field("PNR / codice", t.pnr); Field("Passeggero", t.passenger)
+                        Field("PNR / codice", t.pnr)
+                        Field(if (", " in t.passenger) "Passeggeri" else "Passeggero", t.passenger)
                         if (t.trains.isEmpty() && t.from.isEmpty() && t.date.isEmpty()) {
                             Text(
                                 if (t.isImage || t.isScan) "Dal codice non si leggono i dati del viaggio: tocca la matita per inserire treno e data."
@@ -309,7 +342,7 @@ fun TicketScreen(nav: Nav, id: String) {
                 item { SectionTitle("Andamento in tempo reale") }
                 items(t.trains) { tr ->
                     Button(
-                        onClick = { nav.train(tr.number, null, t.dateMs) },
+                        onClick = { nav.train(tr.number, null, t.dateMsOf(tr)) },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     ) { Text("Segui il treno ${"${tr.category} ${tr.number}".trim()}") }
                 }
@@ -317,19 +350,19 @@ fun TicketScreen(nav: Nav, id: String) {
             if (!t.isScan) item { SectionTitle(if (t.isImage) "Immagine" else "Biglietto") }
             if (!t.isScan) item {
                 Text(
-                    "Tocca per mostrarlo a schermo intero, con la luminosità al massimo.",
+                    "Tocca una pagina per vederla a schermo intero: pizzica o tocca due volte per ingrandire.",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
             val bitmaps = pages.data
             when {
-                bitmaps != null -> items(bitmaps) { b ->
+                bitmaps != null -> items(bitmaps.size) { i ->
                     Image(
-                        b.asImageBitmap(),
+                        bitmaps[i].asImageBitmap(),
                         contentDescription = "Pagina del biglietto",
                         contentScale = ContentScale.FillWidth,
-                        modifier = Modifier.fillMaxWidth().padding(16.dp).background(Color.White).clickable { fullscreen = b },
+                        modifier = Modifier.fillMaxWidth().padding(16.dp).background(Color.White).clickable { zoomPage = i },
                     )
                 }
                 pages.error != null -> item { EmptyText(pages.error) }
@@ -352,6 +385,15 @@ fun TicketScreen(nav: Nav, id: String) {
         )
     }
     fullscreen?.let { b -> FullscreenPage(b) { fullscreen = null } }
+    zoomPage?.let { i ->
+        val preview = pages.data?.getOrNull(i)
+        if (preview == null) zoomPage = null
+        else {
+            // la pagina si rende di nuovo ad alta risoluzione, così resta nitida anche ingrandita
+            val sharp = rememberLoader(id, i) { withContext(Dispatchers.IO) { ticketPageSharp(id, i) } }
+            FullscreenPage(sharp.data ?: preview, smooth = true) { zoomPage = null }
+        }
+    }
 }
 
 @Composable
@@ -363,9 +405,13 @@ private fun Field(label: String, value: String) {
     }
 }
 
-/** Pagina a schermo intero su fondo bianco, con luminosità massima per la lettura del codice. */
+/**
+ * Pagina a schermo intero su fondo bianco, con luminosità massima per la lettura del codice.
+ * Si ingrandisce col pizzico (fino a 6×) o col doppio tocco, si sposta trascinando; un tocco chiude
+ * quando non è ingrandita. [smooth]: filtro per le pagine di testo; senza filtro i moduli del codice restano netti.
+ */
 @Composable
-private fun FullscreenPage(b: Bitmap, onClose: () -> Unit) {
+private fun FullscreenPage(b: Bitmap, smooth: Boolean = false, onClose: () -> Unit) {
     val activity = LocalContext.current as? Activity
     DisposableEffect(Unit) {
         val w = activity?.window
@@ -373,15 +419,53 @@ private fun FullscreenPage(b: Bitmap, onClose: () -> Unit) {
         if (io.github.andreadp.trenolibero.data.AppSettings.qrBrightness) w?.attributes = w?.attributes?.apply { screenBrightness = 1f }
         onDispose { w?.attributes = w?.attributes?.apply { screenBrightness = old ?: -1f } }
     }
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize().background(Color.White).clickable(onClick = onClose), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.fillMaxSize().background(Color.White).clipToBounds()
+                .pointerInput(Unit) {
+                    // spostamento massimo: il bordo della pagina ingrandita non entra nello schermo
+                    fun clamp(o: Offset, s: Float) = Offset(
+                        o.x.coerceIn(-(s - 1) * size.width / 2, (s - 1) * size.width / 2),
+                        o.y.coerceIn(-(s - 1) * size.height / 2, (s - 1) * size.height / 2),
+                    )
+                    detectTapGestures(
+                        onTap = { if (scale <= 1.01f) onClose() },
+                        onDoubleTap = { tap ->
+                            if (scale > 1.01f) { scale = 1f; offset = Offset.Zero }
+                            else {
+                                // ingrandisce attorno al punto toccato
+                                val c = tap - Offset(size.width / 2f, size.height / 2f)
+                                scale = 3f; offset = clamp(c * (1 - 3f), 3f)
+                            }
+                        },
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectTransformGestures { centroid, pan, zoom, _ ->
+                        val s = (scale * zoom).coerceIn(1f, 6f)
+                        val c = centroid - Offset(size.width / 2f, size.height / 2f)
+                        // il punto sotto le dita resta fermo mentre si ingrandisce
+                        val o = c - (c - offset) * (s / scale) + pan
+                        offset = Offset(
+                            o.x.coerceIn(-(s - 1) * size.width / 2, (s - 1) * size.width / 2),
+                            o.y.coerceIn(-(s - 1) * size.height / 2, (s - 1) * size.height / 2),
+                        )
+                        scale = s
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
             Image(
                 b.asImageBitmap(),
                 contentDescription = "Biglietto",
                 contentScale = ContentScale.Fit,
-                // nessun filtro: i moduli del codice restano netti anche ingranditi
-                filterQuality = FilterQuality.None,
-                modifier = Modifier.fillMaxSize().padding(24.dp),
+                filterQuality = if (smooth) FilterQuality.High else FilterQuality.None,
+                modifier = Modifier.fillMaxSize().padding(if (smooth) 8.dp else 24.dp).graphicsLayer {
+                    scaleX = scale; scaleY = scale
+                    translationX = offset.x; translationY = offset.y
+                },
             )
         }
     }
@@ -441,8 +525,17 @@ private fun ticketPages(id: String): List<Bitmap> {
     return if (t?.isImage == true) {
         listOfNotNull(BitmapFactory.decodeFile(Graph.tickets.image(id).path, BitmapFactory.Options().apply { inSampleSize = 2 }))
     } else {
-        TicketCode.renderPdf(Graph.tickets.pdf(id), 1400)
+        // solo le pagine di questo viaggio, se il PDF ne contiene più d'uno
+        TicketCode.renderPdf(Graph.tickets.pdf(id), 1400, maxPages = 20, pages = t?.pages.orEmpty())
     }
+}
+
+/** Una pagina (indice tra quelle mostrate) resa ad alta risoluzione per lo zoom; null per le immagini. */
+private fun ticketPageSharp(id: String, index: Int): Bitmap? {
+    val t = Graph.tickets.get(id) ?: return null
+    if (t.kind != "pdf") return null
+    val page = t.pages.getOrNull(index) ?: index
+    return runCatching { TicketCode.renderPdf(Graph.tickets.pdf(id), 3000, maxPages = 1, pages = listOf(page)).firstOrNull() }.getOrNull()
 }
 
 /** Il codice del biglietto in evidenza, con il pulsante per mostrarlo al controllore. */

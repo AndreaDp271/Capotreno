@@ -140,7 +140,7 @@ fun SubscriptionScreen(nav: Nav, id: String) {
     val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && s != null) scope.launch {
-            importTicket(uri).onSuccess { t -> Graph.subscriptions.save(s.copy(ticketId = t.id)) }
+            importTicket(uri).onSuccess { t -> Graph.subscriptions.save(s.copy(ticketId = t.first().id)) }
         }
     }
 

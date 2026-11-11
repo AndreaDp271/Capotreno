@@ -310,7 +310,7 @@ fun nextTicket(): Ticket? {
         set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
     }.timeInMillis
     val all = Graph.tickets.tickets.value
-    all.filter { !it.isSubscription && (it.dateMs ?: -1) >= today }
+    all.filter { !it.isSubscription && (it.lastDateMs ?: -1) >= today }
         .sortedWith(compareBy({ it.dateMs }, { it.departure }))
         .firstOrNull()?.let { return it }
     val activeSubTickets = Graph.subscriptions.items.value.filter { it.isActive() }.mapNotNull { it.ticketId }
