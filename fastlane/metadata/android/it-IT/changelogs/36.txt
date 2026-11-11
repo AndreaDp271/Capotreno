@@ -1,0 +1,3 @@
+Biglietti: un PDF con più viaggi (es. andata e ritorno) diventa un biglietto per viaggio, ogni treno ha la sua data, tutti i passeggeri dei biglietti di gruppo, pagine ingrandibili.
+Mappa del treno: rilevamenti lungo i binari, nel tratto giusto e sempre in avanti.
+Condivisione del treno: messaggio con ritardo, prossima fermata, arrivo previsto e link a ViaggiaTreno.

@@ -1,0 +1,3 @@
+Tickets: a PDF with several journeys (e.g. return trip) becomes one ticket per journey, each train has its own date, all passengers of group tickets, zoomable pages.
+Train map: positions follow the tracks, in the right section and always forward.
+Train sharing: a message with delay, next stop, expected arrival and a ViaggiaTreno link.
