@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -231,6 +233,7 @@ fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
         }
     }
     var heartSheet by remember { mutableStateOf(false) }
+    var shareDialog by remember { mutableStateOf(false) }
     val liveTrain by io.github.andreadp.trenolibero.data.LiveTrain.followedFlow.collectAsState()
     androidx.compose.runtime.LaunchedEffect(Unit) { io.github.andreadp.trenolibero.data.LiveTrain.all(ctx) }
     var alarmTick by remember { mutableStateOf(0) }
@@ -277,6 +280,9 @@ fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
                         IconButton(onClick = { nav.trainMap(m.number, m.originId, m.dateMs) }) {
                             Icon(Icons.Default.Place, "Mappa del percorso")
                         }
+                        IconButton(onClick = { shareDialog = true }) {
+                            Icon(Icons.Default.Share, "Condividi il treno")
+                        }
                     }
                     IconButton(onClick = state.reload) { Icon(Icons.Default.Refresh, "Aggiorna") }
                 },
@@ -294,6 +300,17 @@ fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
                 )
             }
             LoadedContent(state) { (_, a) -> TrainDetail(nav, a) }
+            if (shareDialog && loaded != null) {
+                val (m, a) = loaded
+                ShareTrainDialog(m, a, onDismiss = { shareDialog = false }) { text ->
+                    shareDialog = false
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, text)
+                    }
+                    ctx.startActivity(android.content.Intent.createChooser(send, "Condividi il treno"))
+                }
+            }
             if (heartSheet && loaded != null) {
                 val (m, a) = loaded
                 val value = "${m.number}|${m.originId}|${m.dateMs}"
@@ -403,4 +420,73 @@ private fun ClockBadge(modifier: Modifier = Modifier) {
         drawLine(color, c, androidx.compose.ui.geometry.Offset(c.x, c.y - size.height * 0.3f), strokeWidth = stroke.width, cap = stroke.cap)
         drawLine(color, c, androidx.compose.ui.geometry.Offset(c.x + size.width * 0.22f, c.y), strokeWidth = stroke.width, cap = stroke.cap)
     }
+}
+
+/**
+ * Condivisione del treno: si sceglie la fermata dove si scende (proposta quella del biglietto, se il treno
+ * è in un biglietto di quel giorno, altrimenti il capolinea) e si manda il messaggio di stato col link a ViaggiaTreno.
+ */
+@Composable
+private fun ShareTrainDialog(m: TrainMatch, a: Andamento, onDismiss: () -> Unit, onShare: (String) -> Unit) {
+    val tickets by Graph.tickets.tickets.collectAsState()
+    val stops = a.fermate
+    val lastReached = stops.indexOfLast { it.reached && !it.suppressed }
+    // fermate dove si può ancora scendere (dopo l'ultima raggiunta)
+    val choices = stops.indices.filter { it > lastReached.coerceAtLeast(0) && !stops[it].suppressed }
+    val fromTicket = remember(tickets, m) {
+        tickets.firstNotNullOfOrNull { t ->
+            t.trains.firstOrNull { it.number == m.number && t.dateMsOf(it) == m.dateMs }?.let { t.to }
+        }?.takeIf { it.isNotBlank() }
+    }
+    val initial = remember(choices, fromTicket) {
+        fromTicket?.let { to -> choices.firstOrNull { DetectionLocator.normalize(stops[it].stazione) == DetectionLocator.normalize(to) } }
+            ?: choices.lastOrNull()
+    }
+    var selected by remember(initial) { mutableStateOf(initial) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Condividi il treno") },
+        text = {
+            Column {
+                Text(
+                    "Manda lo stato del treno con il link a ViaggiaTreno. Dove scendi?",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                androidx.compose.foundation.lazy.LazyColumn(Modifier.padding(top = 8.dp).heightIn(max = 360.dp)) {
+                    items(choices) { i ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { selected = i }.padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            androidx.compose.material3.RadioButton(selected = selected == i, onClick = { selected = i })
+                            Column {
+                                Text(io.github.andreadp.trenolibero.data.TrainShare.place(stops[i].stazione))
+                                Text(
+                                    "prevista ${io.github.andreadp.trenolibero.data.TrainBanner.hm(io.github.andreadp.trenolibero.data.TrainBanner.expected(stops[i], a))}" +
+                                        if (fromTicket != null && i == initial) " · dal tuo biglietto" else "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    item {
+                        Row(
+                            Modifier.fillMaxWidth().clickable { selected = null }.padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            androidx.compose.material3.RadioButton(selected = selected == null, onClick = { selected = null })
+                            Text("Solo lo stato del treno")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                onShare(io.github.andreadp.trenolibero.data.TrainShare.text(a, m.number, selected?.let { stops[it] }, m.dateMs))
+            }) { Text("Condividi") }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = onDismiss) { Text("Annulla") } },
+    )
 }
