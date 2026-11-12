@@ -288,7 +288,7 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
         for (t in Graph.tickets.tickets.value) {
             // il primo treno che viaggia oggi (un PDF può avere andata e ritorno in giorni diversi)
             val train = t.trains.firstOrNull { t.dateOf(it) == today } ?: continue
-            val (m, a) = runCatching { resolveTrainData(train.number, null, t.dateMsOf(train)) }.getOrNull() ?: continue
+            val (m, a) = runCatching { resolveTrainData(train.number, null, t.dateMsOf(train), listOf(t.from, t.to)) }.getOrNull() ?: continue
             val stop = a.fermate.firstOrNull { DetectionLocator.normalize(it.stazione) == DetectionLocator.normalize(t.from) }
                 // la stazione "Da" del biglietto è quella dell'andata: per un ritorno non si indovina la fermata
                 ?: if (train.date.isEmpty()) a.fermate.firstOrNull() else null
@@ -482,16 +482,48 @@ class MonitorWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
     }
 }
 
-/** Come resolveTrain dell'interfaccia, ma utilizzabile dal controllo in background. */
-suspend fun resolveTrainData(number: String, originId: String?, dateMs: Long?): Pair<TrainMatch, Andamento> {
+/**
+ * Trova il treno e il suo andamento (interfaccia e controllo in background).
+ * [stops]: stazioni note del viaggio (Da/A del biglietto), per scegliere tra treni omonimi.
+ */
+suspend fun resolveTrainData(
+    number: String,
+    originId: String?,
+    dateMs: Long?,
+    stops: List<String> = emptyList(),
+    now: Long = System.currentTimeMillis(),
+): Pair<TrainMatch, Andamento> {
+    val future = dateMs != null && dateMs > now
     val match = if (originId != null && dateMs != null) {
         TrainMatch("", number, originId, dateMs)
     } else {
+        // La ricerca per numero elenca solo i treni di oggi
         val found = ViaggiaTrenoApi.searchTrain(number)
-        val m = found.firstOrNull { it.originId == originId } ?: found.firstOrNull()
-            ?: throw ApiException("Treno $number non trovato")
+        val m = found.firstOrNull { it.originId == originId }
+            ?: pickByStops(found, stops)
+            ?: found.firstOrNull()
+            ?: throw ApiException(if (future) FUTURE_TRIP else "Treno $number non trovato per oggi")
+        // Da un biglietto si conosce la data ma non la stazione d'origine
         if (dateMs != null) m.copy(dateMs = dateMs) else m
     }
-    val a = ViaggiaTrenoApi.trainStatus(match.originId, match.number, match.dateMs) ?: throw ApiException("Dati non disponibili")
+    val a = ViaggiaTrenoApi.trainStatus(match.originId, match.number, match.dateMs)
+        ?: throw ApiException(if (future) FUTURE_TRIP else "Dati non disponibili per il treno $number")
     return match to a
+}
+
+const val FUTURE_TRIP = "I dati in tempo reale saranno disponibili il giorno del viaggio"
+
+/** Tra più treni con lo stesso numero, il primo che ferma in una delle [stops] (percorso di oggi). */
+private suspend fun pickByStops(found: List<TrainMatch>, stops: List<String>): TrainMatch? {
+    if (found.size < 2 || stops.none { it.isNotBlank() }) return null
+    return found.firstOrNull { m ->
+        val a = runCatching { ViaggiaTrenoApi.trainStatus(m.originId, m.number, m.dateMs) }.getOrNull()
+        a != null && servesAny(a, stops)
+    }
+}
+
+/** Vero se il treno ferma in almeno una delle stazioni (nomi confrontati senza accenti e punteggiatura). */
+fun servesAny(a: Andamento, stops: List<String>): Boolean {
+    val wanted = stops.map { DetectionLocator.normalize(it) }.filter { it.isNotEmpty() }.toSet()
+    return a.fermate.any { DetectionLocator.normalize(it.stazione) in wanted }
 }

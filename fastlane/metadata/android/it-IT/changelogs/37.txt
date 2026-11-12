@@ -1,0 +1,2 @@
+Segui il treno dal biglietto: tra treni con lo stesso numero sceglie quello che ferma nelle stazioni del biglietto.
+Per un viaggio nei prossimi giorni avvisa che i dati in tempo reale arriveranno il giorno del viaggio, anche se il treno oggi non circola.

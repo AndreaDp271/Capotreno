@@ -276,4 +276,13 @@ class FeaturesTest {
         val av = TicketParser.parse("Abbonamento Frecciarossa Milano - Torino. Punti CartaFRECCIA", stations)
         assertEquals("HIGH_SPEED", av.subscriptionType)
     }
+
+    @Test
+    fun trenoOmonimoSceltoDalleStazioniDelBiglietto() {
+        val a = Andamento(fermate = listOf(Fermata(stazione = "ROMA TERMINI"), Fermata(stazione = "FORLI'")))
+        assertTrue(servesAny(a, listOf("Forlì", "")))
+        assertTrue(servesAny(a, listOf("Bologna Centrale", "Roma Termini")))
+        assertTrue(!servesAny(a, listOf("Bologna Centrale")))
+        assertTrue(!servesAny(a, listOf("", " ")))
+    }
 }

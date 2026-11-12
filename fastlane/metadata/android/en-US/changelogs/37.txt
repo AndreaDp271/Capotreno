@@ -1,0 +1,2 @@
+Follow the train from a ticket: among trains with the same number, it picks the one stopping at the ticket's stations.
+For a trip in the coming days it says live data will be available on the day, even if the train doesn't run today.

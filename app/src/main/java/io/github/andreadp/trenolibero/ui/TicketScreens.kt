@@ -342,7 +342,7 @@ fun TicketScreen(nav: Nav, id: String) {
                 item { SectionTitle("Andamento in tempo reale") }
                 items(t.trains) { tr ->
                     Button(
-                        onClick = { nav.train(tr.number, null, t.dateMsOf(tr)) },
+                        onClick = { nav.train(tr.number, null, t.dateMsOf(tr), listOf(t.from, t.to)) },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     ) { Text("Segui il treno ${"${tr.category} ${tr.number}".trim()}") }
                 }

@@ -40,10 +40,12 @@ import androidx.navigation.navArgument
 class Nav(private val c: NavHostController) {
     fun back() { c.popBackStack() }
 
-    fun train(number: String, originId: String?, dateMs: Long?) {
+    /** [stops]: stazioni note del viaggio (Da/A del biglietto), per distinguere i treni omonimi. */
+    fun train(number: String, originId: String?, dateMs: Long?, stops: List<String> = emptyList()) {
         val q = buildList {
             originId?.let { add("origin=${Uri.encode(it)}") }
             dateMs?.let { add("date=$it") }
+            stops.filter { it.isNotBlank() }.takeIf { it.isNotEmpty() }?.let { add("via=${Uri.encode(it.joinToString("|"))}") }
         }.joinToString("&")
         c.navigate("train/${Uri.encode(number)}" + if (q.isEmpty()) "" else "?$q")
     }
@@ -185,15 +187,19 @@ fun App(pendingImport: Uri? = null, onImportHandled: () -> Unit = {}, pendingRou
                 arguments = listOf(navArgument("focus") { type = NavType.StringType; nullable = true }),
             ) { StationsMapScreen(nav, it.arguments?.getString("focus")) }
             composable(
-                "train/{num}?origin={origin}&date={date}",
+                "train/{num}?origin={origin}&date={date}&via={via}",
                 arguments = listOf(
                     navArgument("num") { type = NavType.StringType },
                     navArgument("origin") { type = NavType.StringType; nullable = true },
                     navArgument("date") { type = NavType.StringType; nullable = true },
+                    navArgument("via") { type = NavType.StringType; nullable = true },
                 ),
             ) {
                 val a = it.arguments!!
-                TrainScreen(nav, a.getString("num")!!, a.getString("origin"), a.getString("date")?.toLongOrNull())
+                TrainScreen(
+                    nav, a.getString("num")!!, a.getString("origin"), a.getString("date")?.toLongOrNull(),
+                    a.getString("via")?.split("|").orEmpty(),
+                )
             }
             composable("trainmap/{num}/{origin}/{date}") {
                 val a = it.arguments!!

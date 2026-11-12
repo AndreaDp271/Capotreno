@@ -72,6 +72,7 @@ import io.github.andreadp.trenolibero.data.Fermata
 import io.github.andreadp.trenolibero.data.Graph
 import io.github.andreadp.trenolibero.data.TrainMatch
 import io.github.andreadp.trenolibero.data.ViaggiaTrenoApi
+import io.github.andreadp.trenolibero.data.resolveTrainData
 import kotlinx.coroutines.launch
 
 // ---------------- Ricerca treno + preferiti ----------------
@@ -193,30 +194,18 @@ fun SectionTitle(text: String) {
 // ---------------- Andamento treno ----------------
 
 /** Risolve origine/data se mancanti (es. preferiti: la data cambia ogni giorno). */
-suspend fun resolveTrain(number: String, originId: String?, dateMs: Long?): Pair<TrainMatch, Andamento> {
-    val match = if (originId != null && dateMs != null) {
-        TrainMatch("", number, originId, dateMs)
-    } else {
-        val found = ViaggiaTrenoApi.searchTrain(number)
-        val m = found.firstOrNull { it.originId == originId } ?: found.firstOrNull()
-            ?: throw ApiException("Treno $number non trovato per oggi")
-        // Da un biglietto si conosce la data ma non la stazione d'origine
-        if (dateMs != null) m.copy(dateMs = dateMs) else m
-    }
-    val status = ViaggiaTrenoApi.trainStatus(match.originId, match.number, match.dateMs)
-        ?: throw ApiException(
-            if (match.dateMs > System.currentTimeMillis()) "I dati in tempo reale saranno disponibili il giorno del viaggio"
-            else "Dati non disponibili per il treno $number"
-        )
-    return match to status
-}
+suspend fun resolveTrain(number: String, originId: String?, dateMs: Long?, stops: List<String> = emptyList()) =
+    resolveTrainData(number, originId, dateMs, stops)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?) {
+fun TrainScreen(nav: Nav, number: String, originId: String?, dateMs: Long?, stops: List<String> = emptyList()) {
     KeepScreenOnIfEnabled()
+    // origine trovata al primo caricamento: gli aggiornamenti non ripetono la scelta tra treni omonimi
+    val found = remember(number, originId, dateMs) { arrayOfNulls<String>(1) }
     val state = rememberLoader(number, originId, dateMs, refreshMs = 30_000) {
-        resolveTrain(number, originId, dateMs).also { (m, a) ->
+        resolveTrain(number, found[0] ?: originId, dateMs, stops).also { (m, a) ->
+            found[0] = m.originId
             DetectionHistory.record(DetectionHistory.key(m.originId, m.number, m.dateMs), a)
         }
     }

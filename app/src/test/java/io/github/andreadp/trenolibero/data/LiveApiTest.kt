@@ -24,6 +24,15 @@ class LiveApiTest {
     }
 
     @Test
+    fun bigliettoDiUnGiornoFuturo() = runBlocking<Unit> {
+        val tomorrow = ViaggiaTrenoApi.searchTrain("9600")[0].dateMs + 86_400_000L
+        val e = runCatching { resolveTrainData("9600", null, tomorrow, now = tomorrow - 3_600_000L) }.exceptionOrNull()
+        assertEquals(FUTURE_TRIP, e?.message)
+        val missing = runCatching { resolveTrainData("99999", null, tomorrow, now = tomorrow - 3_600_000L) }.exceptionOrNull()
+        assertEquals(FUTURE_TRIP, missing?.message)
+    }
+
+    @Test
     fun stazioneETabellone() = runBlocking<Unit> {
         val s = ViaggiaTrenoApi.searchStation("roma termini")
         assertTrue(s.any { it.id == "S08409" })
